@@ -25,6 +25,7 @@ import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
@@ -81,6 +82,8 @@ public class DorisMetadataApplier implements MetadataApplier {
                 applyRenameColumnEvent((RenameColumnEvent) event);
             } else if (event instanceof AlterColumnTypeEvent) {
                 throw new RuntimeException("Unsupported schema change event, " + event);
+            } else if (event instanceof TruncateTableEvent) {
+                applyTruncateTableEvent((TruncateTableEvent) event);
             }
         } catch (Exception ex) {
             throw new RuntimeException(
@@ -191,5 +194,13 @@ public class DorisMetadataApplier implements MetadataApplier {
                     entry.getKey(),
                     entry.getValue());
         }
+    }
+
+    private void applyTruncateTableEvent(TruncateTableEvent event)
+            throws IOException, IllegalArgumentException {
+        TableId tableId = event.tableId();
+        schemaChangeManager.execute(
+                String.format("TRUNCATE TABLE %s;", tableId.getTableName()),
+                tableId.getSchemaName());
     }
 }

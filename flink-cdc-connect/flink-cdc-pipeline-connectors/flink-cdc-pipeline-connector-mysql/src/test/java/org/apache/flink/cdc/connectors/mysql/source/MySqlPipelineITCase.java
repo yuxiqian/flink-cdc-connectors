@@ -28,6 +28,7 @@ import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.source.FlinkSourceProvider;
@@ -318,6 +319,19 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                         .build());
     }
 
+    private CreateTableEvent getOrdersCreateTableEvent(TableId tableId) {
+        return new CreateTableEvent(
+                tableId,
+                Schema.newBuilder()
+                        .physicalColumn("order_number", DataTypes.INT().notNull())
+                        .physicalColumn("order_date", DataTypes.DATE().notNull())
+                        .physicalColumn("purchaser", DataTypes.INT().notNull())
+                        .physicalColumn("quantity", DataTypes.INT().notNull())
+                        .physicalColumn("product_id", DataTypes.INT().notNull())
+                        .primaryKey(Collections.singletonList("order_number"))
+                        .build());
+    }
+
     private List<Event> getSnapshotExpected(TableId tableId) {
         RowType rowType =
                 RowType.of(
@@ -423,6 +437,49 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                                     22.2f
                                 })));
         return snapshotExpected;
+    }
+
+    @Test
+    public void testTruncateTableStatement() throws Exception {
+        env.setParallelism(1);
+        inventoryDatabase.createAndInitialize();
+        MySqlSourceConfigFactory configFactory =
+                new MySqlSourceConfigFactory()
+                        .hostname(MYSQL8_CONTAINER.getHost())
+                        .port(MYSQL8_CONTAINER.getDatabasePort())
+                        .username(TEST_USER)
+                        .password(TEST_PASSWORD)
+                        .databaseList(inventoryDatabase.getDatabaseName())
+                        .tableList(inventoryDatabase.getDatabaseName() + "\\.orders")
+                        .startupOptions(StartupOptions.latest())
+                        .serverId(getServerId(env.getParallelism()))
+                        .serverTimeZone("UTC")
+                        .includeSchemaChanges(SCHEMA_CHANGE_ENABLED.defaultValue());
+
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider) new MySqlDataSource(configFactory).getEventSourceProvider();
+        CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                MySqlDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
+        Thread.sleep(5_000);
+
+        TableId tableId = TableId.tableId(inventoryDatabase.getDatabaseName(), "orders");
+        List<Event> expected = new ArrayList<>();
+        expected.add(getOrdersCreateTableEvent(tableId));
+        try (Connection connection = inventoryDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+
+            statement.execute(
+                    String.format(
+                            "TRUNCATE TABLE `%s`.`orders`;", inventoryDatabase.getDatabaseName()));
+            expected.add(new TruncateTableEvent(tableId));
+        }
+        List<Event> actual = fetchResults(events, expected.size());
+        assertThat(actual).isEqualTo(expected);
     }
 
     /**

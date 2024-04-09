@@ -33,7 +33,6 @@ import io.debezium.connector.mysql.antlr.listener.DropViewParserListener;
 import io.debezium.connector.mysql.antlr.listener.MySqlAntlrDdlParserListener;
 import io.debezium.connector.mysql.antlr.listener.RenameTableParserListener;
 import io.debezium.connector.mysql.antlr.listener.SetStatementParserListener;
-import io.debezium.connector.mysql.antlr.listener.TruncateTableParserListener;
 import io.debezium.connector.mysql.antlr.listener.UseStatementParserListener;
 import io.debezium.ddl.parser.mysql.generated.MySqlParser;
 import io.debezium.ddl.parser.mysql.generated.MySqlParserBaseListener;
@@ -82,7 +81,7 @@ public class CustomMySqlAntlrDdlParserListener extends MySqlParserBaseListener
         listeners.add(new CustomAlterTableParserListener(parser, listeners, parsedEvents));
         listeners.add(new DropTableParserListener(parser));
         listeners.add(new RenameTableParserListener(parser));
-        listeners.add(new TruncateTableParserListener(parser));
+        listeners.add(new CustomTruncateTableParserListener(parser, parsedEvents));
         listeners.add(new CreateViewParserListener(parser, listeners));
         listeners.add(new AlterViewParserListener(parser, listeners));
         listeners.add(new DropViewParserListener(parser));
