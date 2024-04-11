@@ -18,8 +18,8 @@
 
 require 'zip'
 
-# These packages don't need to be checked
-EXCLUDED_PACKAGES = %w[flink-cdc-dist flink-cdc-e2e-tests].freeze
+# These maven modules don't need to be checked
+EXCLUDED_MODULES = %w[flink-cdc-dist flink-cdc-e2e-tests].freeze
 
 # Questionable license statements which shouldn't occur in packaged jar files
 QUESTIONABLE_STATEMENTS = [
@@ -59,6 +59,24 @@ QUESTIONABLE_STATEMENTS = [
   'Don’t be evil'
 ].freeze
 
+# These file extensions are binary-formatted. No check needed.
+BINARY_FILE_EXTENSIONS = %w[.class .dylib .so .dll .gif .ico].freeze
+
+# These packages are licensed under "Weak Copyleft" licenses.
+# According to Apache official guidelines, such software could be
+# packaged in jar if appropriately labelled.
+# See https://www.apache.org/legal/resolved.html for more details.
+EXCEPTION_PACKAGES = [
+  'org/glassfish/jersey/', # dual-licensed under GPL 2 and EPL 2.0
+  'org.glassfish.jersey', # dual-licensed under GPL 2 and EPL 2.0
+  'org.glassfish.hk2', # dual-licensed under GPL 2 and EPL 2.0
+  'javax.ws.rs-api', # dual-licensed under GPL 2 and EPL 2.0
+  'jakarta.ws.rs' # dual-licensed under GPL 2 and EPL 2.0
+].freeze
+
+
+puts 'Start license check...'
+
 # Extract Flink CDC revision number from global pom.xml
 begin
   REVISION_NUMBER = File.read('pom.xml').scan(%r{<revision>(.*)</revision>}).last[0]
@@ -71,7 +89,7 @@ puts "Flink CDC version: '#{REVISION_NUMBER}'"
 # Traversing maven module in given path
 def traverse_module(path)
   module_name = File.basename path
-  return if EXCLUDED_PACKAGES.include?(module_name)
+  return if EXCLUDED_MODULES.include?(module_name)
 
   jar_file = File.join path, 'target', "#{module_name}-#{REVISION_NUMBER}.jar"
   check_jar_license jar_file if File.exist? jar_file
@@ -88,13 +106,14 @@ def check_jar_license(jar_file)
   puts "Checking jar file #{jar_file}"
   Zip::File.open(jar_file) do |jar|
     jar.filter { |e| e.ftype == :file }
-       .filter { |e| !File.basename(e.name).end_with? '.class', '.dylib', '.so', '.dll', '.gif', '.ico' }
+       .filter { |e| !File.basename(e.name).end_with?(*BINARY_FILE_EXTENSIONS) }
        .filter { |e| File.basename(e.name).downcase != 'dependencies' } # frequent false-positives due to dual-licensing
        .filter { |e| !File.basename(e.name).downcase.start_with? 'license' } # false-positives due to dual-licensing
        .filter { |e| !File.basename(e.name).downcase.start_with? 'notice' } # false-positives due to optional components
-       .filter { |e| !e.name.downcase.start_with? 'org/glassfish/jersey' } # dual-licensed under GPL 2 and EPL 2.0
-       .filter { |e| !e.name.downcase.include? 'org.glassfish.hk2' } # dual-licensed under GPL 2 and EPL 2.0
-       .filter { |e| !e.name.downcase.include? 'org.glassfish.jersey' } # dual-licensed under GPL 2 and EPL 2.0
+       .filter { |e| EXCEPTION_PACKAGES.none? { |ex| e.name.include? ex } }
+       # .filter { |e| !e.name.downcase.start_with? 'org/glassfish/jersey' } # dual-licensed under GPL 2 and EPL 2.0
+       # .filter { |e| !e.name.downcase.include? 'org.glassfish.hk2' } # dual-licensed under GPL 2 and EPL 2.0
+       # .filter { |e| !e.name.downcase.include? 'org.glassfish.jersey' } # dual-licensed under GPL 2 and EPL 2.0
        .map do |e|
          content = e.get_input_stream.read.force_encoding('UTF-8')
          next unless QUESTIONABLE_STATEMENTS.map { |stmt| content.include?(stmt) }.any?
@@ -112,7 +131,7 @@ traverse_module '.'
 unless @tainted_records.empty?
   puts "\nError: packaged jar contains files with incompatible licenses:"
   puts @tainted_records.map { |e| "  -> In #{e[:jar_file]}: #{e[:suspicious_file]}" }.join("\n")
-  abort 'See https://www.apache.org/legal/resolved.html for allowed license details.'
+  abort 'See https://www.apache.org/legal/resolved.html for more details.'
 end
 
 puts 'License check passed.'
