@@ -19,6 +19,7 @@ on:
     branches:
       - master
       - release-*
+      - add-license-check-script
     paths-ignore:
       - 'docs/**'
       - 'README.md'
@@ -85,6 +86,14 @@ env:
   flink-cdc-e2e-tests/flink-cdc-source-e2e-tests"
 
 jobs:
+  license_check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compiling jar packages
+        run: mvn --no-snapshot-updates -B package
+      - name: Run license check
+        run: gem install zipfile && ./tools/ci/license_check.rb
+
   compile_and_test:
     # Only run the CI pipeline for the flink-cdc-connectors repository
 #    if: github.repository == 'apache/flink-cdc-connectors'
