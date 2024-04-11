@@ -16,7 +16,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-require 'rubyzip'
+require 'zip'
 
 # Extract Flink CDC revision number from global pom.xml
 begin
