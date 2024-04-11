@@ -94,7 +94,7 @@ jobs:
         with:
           submodules: true
       - name: Set up Ruby environment
-        uses: actions/setup-ruby@v1
+        uses: ruby/setup-ruby@v1
       - name: Compiling jar packages
         run: mvn --no-snapshot-updates -B package -DskipTests
       - name: Run license check
