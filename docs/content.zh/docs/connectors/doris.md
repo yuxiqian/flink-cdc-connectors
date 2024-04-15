@@ -250,13 +250,13 @@ pipeline:
     </tr>
     <tr>
       <td>CHAR(n)</td>
-      <td>CHAR(n*3)</td>
-      <td>在Doris中，字符串是以UTF-8编码存储的，所以英文字符占1个字节，中文字符占3个字节。这里的长度统一乘3，CHAR最大的长度是255，超过后会自动转为VARCHAR类型</td>
+      <td>CHAR(n*4)</td>
+      <td>在Doris中，字符串是以UTF-8编码存储的，每个字符编码最长占用 4 个字节。CHAR最大的长度是255，超过后会自动转为VARCHAR类型</td>
     </tr>
     <tr>
       <td>VARCHAR(n)</td>
-      <td>VARCHAR(n*3)</td>
-      <td>同上，这里的长度统一乘3，VARCHAR最大的长度是65533，超过后会自动转为STRING类型</td>
+      <td>VARCHAR(n*4)</td>
+      <td>同上，这里的长度统一乘4，VARCHAR最大的长度是65533，超过后会自动转为STRING类型</td>
     </tr>
     <tr>
       <td>

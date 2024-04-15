@@ -250,13 +250,13 @@ pipeline:
     </tr>
     <tr>
       <td>CHAR(n)</td>
-      <td>CHAR(n*3)</td>
-      <td>In Doris, strings are stored in UTF-8 encoding, so English characters occupy 1 byte and Chinese characters occupy 3 bytes. The length here is multiplied by 3. The maximum length of CHAR is 255. Once exceeded, it will automatically be converted to VARCHAR type.</td>
+      <td>CHAR(n*4)</td>
+      <td>In Doris, strings are stored in UTF-8 encoding, and each character will be encoded with 4 bytes at most. The length here is multiplied by 4. The maximum length of CHAR is 255. Once exceeded, it will automatically be converted to VARCHAR type.</td>
     </tr>
     <tr>
       <td>VARCHAR(n)</td>
-      <td>VARCHAR(n*3)</td>
-      <td>Same as above. The length here is multiplied by 3. The maximum length of VARCHAR is 65533. Once exceeded, it will automatically be converted to STRING type.</td>
+      <td>VARCHAR(n*4)</td>
+      <td>Same as above. The length here is multiplied by 4. The maximum length of VARCHAR is 65533. Once exceeded, it will automatically be converted to STRING type.</td>
     </tr>
     <tr>
       <td>
