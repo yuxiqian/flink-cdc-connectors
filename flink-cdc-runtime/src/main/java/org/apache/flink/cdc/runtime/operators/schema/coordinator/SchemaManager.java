@@ -19,6 +19,7 @@ package org.apache.flink.cdc.runtime.operators.schema.coordinator;
 
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
+import org.apache.flink.cdc.common.event.SchemaBeforeChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -48,8 +49,8 @@ import java.util.TreeMap;
 import static org.apache.flink.cdc.common.utils.Preconditions.checkArgument;
 
 /**
- * Schema manager handles handles schema changes for tables, and manages historical schema versions
- * of tables.
+ * Schema manager handles schema changes for tables, and manages historical schema versions of
+ * tables.
  */
 @Internal
 public class SchemaManager {
@@ -97,6 +98,18 @@ public class SchemaManager {
         return versionedSchemas.get(version);
     }
 
+    public void normalizeSchema(SchemaChangeEvent schemaChangeEvent, Schema oldSchema) {
+        if (!(schemaChangeEvent instanceof SchemaBeforeChangeEvent)) {
+            return;
+        }
+
+        SchemaBeforeChangeEvent schemaBeforeChangeEvent =
+                (SchemaBeforeChangeEvent) schemaChangeEvent;
+        if (!schemaBeforeChangeEvent.hasSchemaBeforeChange()) {
+            schemaBeforeChangeEvent.fillSchemaBeforeChange(oldSchema);
+        }
+    }
+
     /** Apply schema change to a table. */
     public void applySchemaChange(SchemaChangeEvent schemaChangeEvent) {
         if (schemaChangeEvent instanceof CreateTableEvent) {
@@ -108,6 +121,7 @@ public class SchemaManager {
                     "Unable to apply SchemaChangeEvent for table \"%s\" without existing schema",
                     schemaChangeEvent.tableId());
 
+            normalizeSchema(schemaChangeEvent, optionalSchema.get());
             LOG.info("Handling schema change event: {}", schemaChangeEvent);
             registerNewSchema(
                     schemaChangeEvent.tableId(),

@@ -248,7 +248,9 @@ class SchemaDerivationTest {
                                                 new PhysicalColumn(
                                                         "gender", DataTypes.STRING(), null)))),
                         new AlterColumnTypeEvent(
-                                MERGED_TABLE, ImmutableMap.of("age", DataTypes.BIGINT())));
+                                MERGED_TABLE,
+                                ImmutableMap.of("age", DataTypes.BIGINT()),
+                                ImmutableMap.of("age", DataTypes.INT())));
 
         // Add column for table 1
         AddColumnEvent.ColumnWithPosition newCol1 =

@@ -17,16 +17,21 @@
 
 package org.apache.flink.cdc.common.event;
 
+import org.apache.flink.cdc.common.schema.Column;
+import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * A {@link SchemaChangeEvent} that represents an {@code ALTER COLUMN} DDL, which may contain the
  * lenient column type changes.
  */
-public class AlterColumnTypeEvent implements SchemaChangeEvent {
+public class AlterColumnTypeEvent implements SchemaBeforeChangeEvent {
 
     private static final long serialVersionUID = 1L;
 
@@ -35,9 +40,21 @@ public class AlterColumnTypeEvent implements SchemaChangeEvent {
     /** key => column name, value => column type after changing. */
     private final Map<String, DataType> typeMapping;
 
+    private final Map<String, DataType> oldTypeMapping;
+
     public AlterColumnTypeEvent(TableId tableId, Map<String, DataType> typeMapping) {
         this.tableId = tableId;
         this.typeMapping = typeMapping;
+        this.oldTypeMapping = new HashMap<>();
+    }
+
+    public AlterColumnTypeEvent(
+            TableId tableId,
+            Map<String, DataType> typeMapping,
+            Map<String, DataType> oldTypeMapping) {
+        this.tableId = tableId;
+        this.typeMapping = typeMapping;
+        this.oldTypeMapping = oldTypeMapping;
     }
 
     /** Returns the type mapping. */
@@ -55,12 +72,13 @@ public class AlterColumnTypeEvent implements SchemaChangeEvent {
         }
         AlterColumnTypeEvent that = (AlterColumnTypeEvent) o;
         return Objects.equals(tableId, that.tableId)
-                && Objects.equals(typeMapping, that.typeMapping);
+                && Objects.equals(typeMapping, that.typeMapping)
+                && Objects.equals(oldTypeMapping, that.oldTypeMapping);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(tableId, typeMapping);
+        return Objects.hash(tableId, typeMapping, oldTypeMapping);
     }
 
     @Override
@@ -68,13 +86,46 @@ public class AlterColumnTypeEvent implements SchemaChangeEvent {
         return "AlterColumnTypeEvent{"
                 + "tableId="
                 + tableId
-                + ", nameMapping="
+                + ", typeMapping="
                 + typeMapping
+                + ", oldTypeMapping="
+                + oldTypeMapping
                 + '}';
     }
 
     @Override
     public TableId tableId() {
         return tableId;
+    }
+
+    public Map<String, DataType> getOldTypeMapping() {
+        return oldTypeMapping;
+    }
+
+    @Override
+    public boolean hasSchemaBeforeChange() {
+        return !oldTypeMapping.isEmpty();
+    }
+
+    @Override
+    public void fillSchemaBeforeChange(Schema oldTypeSchema) {
+        oldTypeMapping.clear();
+        oldTypeMapping.putAll(
+                oldTypeSchema.getColumns().stream()
+                        .filter(e -> typeMapping.containsKey(e.getName()))
+                        .collect(Collectors.toMap(Column::getName, Column::getType)));
+    }
+
+    public void trimRedundantChanges() {
+        if (hasSchemaBeforeChange()) {
+            Set<String> redundantlyChangedColumns =
+                    typeMapping.keySet().stream()
+                            .filter(e -> Objects.equals(typeMapping.get(e), oldTypeMapping.get(e)))
+                            .collect(Collectors.toSet());
+
+            // Remove redundant alter column type records that doesn't really change the type
+            typeMapping.keySet().removeAll(redundantlyChangedColumns);
+            oldTypeMapping.keySet().removeAll(redundantlyChangedColumns);
+        }
     }
 }
