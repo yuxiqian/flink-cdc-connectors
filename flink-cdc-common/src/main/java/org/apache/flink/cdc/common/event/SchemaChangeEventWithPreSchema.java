@@ -20,11 +20,11 @@ package org.apache.flink.cdc.common.event;
 import org.apache.flink.cdc.common.schema.Schema;
 
 /** A {@link SchemaChangeEvent} that supports appending schema before change event. */
-public interface SchemaBeforeChangeEvent extends SchemaChangeEvent {
+public interface SchemaChangeEventWithPreSchema extends SchemaChangeEvent {
 
     /** Describes if this event already has schema before change info. */
-    boolean hasSchemaBeforeChange();
+    boolean hasPreSchema();
 
     /** Append schema before change info to this event. */
-    void fillSchemaBeforeChange(Schema oldSchema);
+    void fillPreSchema(Schema oldSchema);
 }

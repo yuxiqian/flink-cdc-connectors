@@ -31,7 +31,7 @@ import java.util.stream.Collectors;
  * A {@link SchemaChangeEvent} that represents an {@code ALTER COLUMN} DDL, which may contain the
  * lenient column type changes.
  */
-public class AlterColumnTypeEvent implements SchemaBeforeChangeEvent {
+public class AlterColumnTypeEvent implements SchemaChangeEventWithPreSchema {
 
     private static final long serialVersionUID = 1L;
 
@@ -103,12 +103,12 @@ public class AlterColumnTypeEvent implements SchemaBeforeChangeEvent {
     }
 
     @Override
-    public boolean hasSchemaBeforeChange() {
+    public boolean hasPreSchema() {
         return !oldTypeMapping.isEmpty();
     }
 
     @Override
-    public void fillSchemaBeforeChange(Schema oldTypeSchema) {
+    public void fillPreSchema(Schema oldTypeSchema) {
         oldTypeMapping.clear();
         oldTypeMapping.putAll(
                 oldTypeSchema.getColumns().stream()
@@ -117,7 +117,7 @@ public class AlterColumnTypeEvent implements SchemaBeforeChangeEvent {
     }
 
     public void trimRedundantChanges() {
-        if (hasSchemaBeforeChange()) {
+        if (hasPreSchema()) {
             Set<String> redundantlyChangedColumns =
                     typeMapping.keySet().stream()
                             .filter(e -> Objects.equals(typeMapping.get(e), oldTypeMapping.get(e)))

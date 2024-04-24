@@ -19,8 +19,8 @@ package org.apache.flink.cdc.runtime.operators.schema.coordinator;
 
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
-import org.apache.flink.cdc.common.event.SchemaBeforeChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventWithPreSchema;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
@@ -99,14 +99,14 @@ public class SchemaManager {
     }
 
     public void normalizeSchema(SchemaChangeEvent schemaChangeEvent, Schema oldSchema) {
-        if (!(schemaChangeEvent instanceof SchemaBeforeChangeEvent)) {
+        if (!(schemaChangeEvent instanceof SchemaChangeEventWithPreSchema)) {
             return;
         }
 
-        SchemaBeforeChangeEvent schemaBeforeChangeEvent =
-                (SchemaBeforeChangeEvent) schemaChangeEvent;
-        if (!schemaBeforeChangeEvent.hasSchemaBeforeChange()) {
-            schemaBeforeChangeEvent.fillSchemaBeforeChange(oldSchema);
+        SchemaChangeEventWithPreSchema schemaBeforeChangeEvent =
+                (SchemaChangeEventWithPreSchema) schemaChangeEvent;
+        if (!schemaBeforeChangeEvent.hasPreSchema()) {
+            schemaBeforeChangeEvent.fillPreSchema(oldSchema);
         }
     }
 
