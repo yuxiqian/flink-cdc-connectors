@@ -87,6 +87,46 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
+    public void testColumnTransform() throws Exception {
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: %s\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.TABLEALPHA\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: values\n"
+                                + "transform:\n"
+                                + "  - source-table: %s.TABLEALPHA\n"
+                                + "    projection: ID, CONCAT('v', VERSION) AS VER\n"
+                                + "    filter: ID > 1008\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  parallelism: 1",
+                        INTER_CONTAINER_MYSQL_ALIAS,
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        transformRenameDatabase.getDatabaseName(),
+                        transformRenameDatabase.getDatabaseName());
+        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
+        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
+        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
+        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+        LOG.info("Pipeline job is running");
+        Thread.sleep(7000);
+
+        String stdout = taskManagerConsumer.toUtf8String();
+        System.out.println(stdout);
+    }
+
+    @Test
     public void testHeteroSchemaTransform() throws Exception {
         String pipelineJob =
                 String.format(
