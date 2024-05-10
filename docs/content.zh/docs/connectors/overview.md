@@ -40,7 +40,7 @@ Flink CDC 提供了多个Source和Sink连接器来与外部系统交互。您可
 
 如果现有的连接器无法满足您的需求，您可以自行开发自己的连接器，以将您的外部系统集成到 Flink CDC 数据管道中。查阅 [Flink CDC APIs]({{< ref "docs/developer-guide/understand-flink-cdc-api" >}}) 了解如何开发您自己的连接器。
 
-## Legacy Flink CDC Sources
-在 3.0 版本之前引入的 Flink CDC Source 仍然可以作为普通的 Flink 连接器使用。您可以在 [Legacy CDC Sources/概览]({{< ref "docs/connectors/legacy-flink-cdc-sources/overview" >}}) 中找到更多详细信息。
+## CDC Sources for Flink
+在 3.0 版本之前引入的 Flink CDC Source 仍然可以作为普通的 Flink 连接器使用。您可以在 [CDC Sources for Flink/概览]({{< ref "docs/connectors/cdc-sources-for-flink/overview" >}}) 中找到更多详细信息。
 
 {{< top >}}

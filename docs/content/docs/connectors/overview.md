@@ -46,11 +46,11 @@ your own connector to get your external system involved in Flink CDC pipelines.
 Check out [Flink CDC APIs]({{< ref "docs/developer-guide/understand-flink-cdc-api" >}})
 to learn how to develop your own connectors.
 
-## Legacy Flink CDC Sources
+## CDC Sources for Flink
 
 Flink CDC sources introduces before 3.0 are still available as normal Flink 
 connector sources. You can find more details in the 
-[overview page]({{< ref "docs/connectors/legacy-flink-cdc-sources/overview" >}})
-of legacy Flink CDC sources.
+[overview page]({{< ref "docs/connectors/cdc-sources-for-flink/overview" >}})
+of CDC sources for Flink.
 
 {{< top >}}
