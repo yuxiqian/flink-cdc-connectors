@@ -284,7 +284,7 @@ public class Db2Utils {
         StringBuilder sql = new StringBuilder();
         for (Iterator<String> fieldNamesIt = pkRowType.getFieldNames().iterator();
                 fieldNamesIt.hasNext(); ) {
-            sql.append(fieldNamesIt.next());
+            sql.append(quote(fieldNamesIt.next()));
             if (fieldNamesIt.hasNext()) {
                 sql.append(" , ");
             }
@@ -358,7 +358,7 @@ public class Db2Utils {
         StringBuilder sql = new StringBuilder();
         for (Iterator<String> fieldNamesIt = pkRowType.getFieldNames().iterator();
                 fieldNamesIt.hasNext(); ) {
-            sql.append("MAX(" + fieldNamesIt.next() + ")");
+            sql.append(String.format("MAX(%s)", quote(fieldNamesIt.next())));
             if (fieldNamesIt.hasNext()) {
                 sql.append(" , ");
             }
@@ -410,7 +410,7 @@ public class Db2Utils {
             RowType pkRowType, StringBuilder sql, String predicate) {
         for (Iterator<String> fieldNamesIt = pkRowType.getFieldNames().iterator();
                 fieldNamesIt.hasNext(); ) {
-            sql.append(fieldNamesIt.next()).append(predicate);
+            sql.append(quote(fieldNamesIt.next())).append(predicate);
             if (fieldNamesIt.hasNext()) {
                 sql.append(" AND ");
             }
