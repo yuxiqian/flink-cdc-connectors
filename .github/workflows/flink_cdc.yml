@@ -120,7 +120,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        jdk: [ 8 ]
+        jdk: [ 11 ]
         module: [ "core",
                   "pipeline_connectors",
                   "mysql",
