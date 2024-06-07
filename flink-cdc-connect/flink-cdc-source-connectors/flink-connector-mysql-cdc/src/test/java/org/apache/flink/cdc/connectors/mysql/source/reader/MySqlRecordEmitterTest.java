@@ -23,6 +23,7 @@ import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplitState;
 import org.apache.flink.cdc.connectors.mysql.source.split.SourceRecords;
+import org.apache.flink.cdc.connectors.mysql.testutils.DefaultTopicNamingStrategy;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.connector.testutils.source.reader.TestingReaderOutput;
 import org.apache.flink.runtime.metrics.groups.UnregisteredMetricGroups;
@@ -34,15 +35,14 @@ import io.debezium.heartbeat.Heartbeat;
 import io.debezium.heartbeat.HeartbeatFactory;
 import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.relational.TableId;
-import io.debezium.schema.TopicSelector;
-import io.debezium.util.SchemaNameAdjuster;
+import io.debezium.schema.SchemaNameAdjuster;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.Test;
 
 import java.util.Collections;
 
-import static io.debezium.config.CommonConnectorConfig.TRANSACTION_TOPIC;
-import static io.debezium.connector.mysql.MySqlConnectorConfig.SERVER_NAME;
+import static io.debezium.config.CommonConnectorConfig.TOPIC_PREFIX;
+import static io.debezium.connector.mysql.MySqlConnectorConfig.TOPIC_NAMING_STRATEGY;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
@@ -54,16 +54,15 @@ public class MySqlRecordEmitterTest {
         Configuration dezConf =
                 JdbcConfiguration.create()
                         .with(Heartbeat.HEARTBEAT_INTERVAL, 100)
-                        .with(TRANSACTION_TOPIC, "fake-topic")
-                        .with(SERVER_NAME, "mysql_binlog_source")
+                        .with(TOPIC_NAMING_STRATEGY, "${database.server.name}.fake-topic")
+                        .with(TOPIC_PREFIX, "mysql_binlog_source")
                         .build();
 
         MySqlConnectorConfig mySqlConfig = new MySqlConnectorConfig(dezConf);
         HeartbeatFactory<TableId> heartbeatFactory =
                 new HeartbeatFactory<>(
                         new MySqlConnectorConfig(dezConf),
-                        TopicSelector.defaultSelector(
-                                mySqlConfig, (id, prefix, delimiter) -> "fake-topic"),
+                        DefaultTopicNamingStrategy.create(mySqlConfig),
                         SchemaNameAdjuster.create());
         Heartbeat heartbeat = heartbeatFactory.createHeartbeat();
         BinlogOffset fakeOffset = BinlogOffset.ofBinlogFilePosition("fake-file", 15213L);

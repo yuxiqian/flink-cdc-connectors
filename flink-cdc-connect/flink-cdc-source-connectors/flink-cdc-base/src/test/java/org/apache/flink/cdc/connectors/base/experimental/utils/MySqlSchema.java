@@ -79,7 +79,7 @@ public class MySqlSchema {
                             final MySqlOffsetContext offsetContext =
                                     MySqlOffsetContext.initial(connectorConfig);
                             final MySqlPartition partition =
-                                    new MySqlPartition(connectorConfig.getLogicalName());
+                                    new MySqlPartition(connectorConfig.getLogicalName(), null);
                             List<SchemaChangeEvent> schemaChangeEvents =
                                     databaseSchema.parseSnapshotDdl(
                                             partition,

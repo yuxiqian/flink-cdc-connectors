@@ -38,14 +38,13 @@ import io.debezium.connector.postgresql.PostgresConnectorConfig;
 import io.debezium.connector.postgresql.PostgresObjectUtils;
 import io.debezium.connector.postgresql.PostgresSchema;
 import io.debezium.connector.postgresql.PostgresTaskContext;
-import io.debezium.connector.postgresql.PostgresTopicSelector;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.connector.postgresql.connection.PostgresReplicationConnection;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
 import io.debezium.relational.history.TableChanges.TableChange;
-import io.debezium.schema.TopicSelector;
+import io.debezium.spi.topic.TopicNamingStrategy;
 
 import javax.annotation.Nullable;
 
@@ -104,21 +103,22 @@ public class PostgresDialect implements JdbcDataSourceDialect {
             PostgresConnection jdbcConnection) {
         try {
             PostgresConnectorConfig pgConnectorConfig = sourceConfig.getDbzConnectorConfig();
-            TopicSelector<TableId> topicSelector = PostgresTopicSelector.create(pgConnectorConfig);
+            TopicNamingStrategy<TableId> topicNamingStrategy =
+                    pgConnectorConfig.getTopicNamingStrategy(
+                            PostgresConnectorConfig.TOPIC_NAMING_STRATEGY);
             PostgresConnection.PostgresValueConverterBuilder valueConverterBuilder =
                     newPostgresValueConverterBuilder(pgConnectorConfig);
             PostgresSchema schema =
                     PostgresObjectUtils.newSchema(
                             jdbcConnection,
                             pgConnectorConfig,
-                            jdbcConnection.getTypeRegistry(),
-                            topicSelector,
+                            topicNamingStrategy,
                             valueConverterBuilder.build(jdbcConnection.getTypeRegistry()));
             PostgresTaskContext taskContext =
-                    PostgresObjectUtils.newTaskContext(pgConnectorConfig, schema, topicSelector);
+                    PostgresObjectUtils.newTaskContext(
+                            pgConnectorConfig, schema, topicNamingStrategy);
             return (PostgresReplicationConnection)
-                    createReplicationConnection(
-                            taskContext, jdbcConnection, false, pgConnectorConfig);
+                    createReplicationConnection(taskContext, jdbcConnection, pgConnectorConfig);
         } catch (SQLException e) {
             throw new RuntimeException("Failed to initialize PostgresReplicationConnection", e);
         }

@@ -60,7 +60,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static io.debezium.connector.oracle.logminer.LogMinerHelper.logError;
 import static io.debezium.connector.oracle.logminer.LogMinerHelper.setLogFilesForMining;
 
 /**
@@ -247,7 +246,7 @@ public class LogMinerStreamingChangeEventSource
                                 retryAttempts++;
                             } else {
                                 retryAttempts = 1;
-                                startScn = processor.process(partition, startScn, endScn);
+                                startScn = processor.process(startScn, endScn);
                                 streamingMetrics.setCurrentBatchProcessingTime(
                                         Duration.between(start, Instant.now()));
                                 captureSessionMemoryStatistics(jdbcConnection);
@@ -258,7 +257,7 @@ public class LogMinerStreamingChangeEventSource
                 }
             }
         } catch (Throwable t) {
-            logError(streamingMetrics, "Mining session stopped due to the {}", t);
+            LOGGER.error("Mining session {} stopped due to the {}", streamingMetrics, t);
             errorHandler.setProducerThrowable(t);
         } finally {
             LOGGER.info("startScn={}, endScn={}", startScn, endScn);
@@ -1074,10 +1073,5 @@ public class LogMinerStreamingChangeEventSource
                                 l.getFirstScn().compareTo(startScn) <= 0
                                         && l.getNextScn().compareTo(startScn) > 0
                                         && l.getType().equals(LogFile.Type.ARCHIVE));
-    }
-
-    @Override
-    public void commitOffset(Map<String, ?> offset) {
-        // nothing to do
     }
 }

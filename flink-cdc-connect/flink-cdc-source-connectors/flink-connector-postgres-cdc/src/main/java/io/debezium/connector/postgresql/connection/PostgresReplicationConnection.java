@@ -98,7 +98,6 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
      *     closed
      * @param statusUpdateInterval the interval at which the replication connection should
      *     periodically send status
-     * @param doSnapshot whether the connector is doing snapshot
      * @param jdbcConnection general PostgreSQL JDBC connection
      * @param typeRegistry registry with PostgreSQL types
      * @param streamParams additional parameters to pass to the replication stream
@@ -113,7 +112,6 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
             PostgresConnectorConfig.AutoCreateMode publicationAutocreateMode,
             PostgresConnectorConfig.LogicalDecoder plugin,
             boolean dropSlotOnClose,
-            boolean doSnapshot,
             Duration statusUpdateInterval,
             PostgresConnection jdbcConnection,
             TypeRegistry typeRegistry,
@@ -122,7 +120,6 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
         super(
                 addDefaultSettings(config.getJdbcConfig()),
                 PostgresConnection.FACTORY,
-                null,
                 null,
                 "\"",
                 "\"");
@@ -495,13 +492,7 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
 
         try {
             try {
-                s =
-                        startPgReplicationStream(
-                                startLsn,
-                                plugin.forceRds()
-                                        ? messageDecoder::optionsWithoutMetadata
-                                        : messageDecoder::optionsWithMetadata);
-                messageDecoder.setContainsMetadata(plugin.forceRds() ? false : true);
+                s = startPgReplicationStream(startLsn, messageDecoder::defaultOptions);
             } catch (PSQLException e) {
                 LOGGER.debug(
                         "Could not register for streaming, retrying without optional options", e);
@@ -512,29 +503,10 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
                     initReplicationSlot();
                 }
 
-                s =
-                        startPgReplicationStream(
-                                startLsn,
-                                plugin.forceRds()
-                                        ? messageDecoder::optionsWithoutMetadata
-                                        : messageDecoder::optionsWithMetadata);
-                messageDecoder.setContainsMetadata(plugin.forceRds() ? false : true);
+                s = startPgReplicationStream(startLsn, messageDecoder::defaultOptions);
             }
         } catch (PSQLException e) {
-            if (e.getMessage().matches("(?s)ERROR: option .* is unknown.*")) {
-                // It is possible we are connecting to an old wal2json plug-in
-                LOGGER.warn(
-                        "Could not register for streaming with metadata in messages, falling back to messages without metadata");
-
-                // re-init the slot after a failed start of slot, as this
-                // may have closed the slot
-                if (useTemporarySlot()) {
-                    initReplicationSlot();
-                }
-
-                s = startPgReplicationStream(startLsn, messageDecoder::optionsWithoutMetadata);
-                messageDecoder.setContainsMetadata(false);
-            } else if (e.getMessage()
+            if (e.getMessage()
                     .matches("(?s)ERROR: requested WAL segment .* has already been removed.*")) {
                 LOGGER.error("Cannot rewind to last processed WAL position", e);
                 throw new ConnectException(
@@ -808,7 +780,6 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
                 PostgresConnectorConfig.LogicalDecoder.DECODERBUFS;
         private boolean dropSlotOnClose = DEFAULT_DROP_SLOT_ON_CLOSE;
         private Duration statusUpdateIntervalVal;
-        private boolean doSnapshot;
         private TypeRegistry typeRegistry;
         private PostgresSchema schema;
         private Properties slotStreamParams = new Properties();
@@ -889,12 +860,6 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
         }
 
         @Override
-        public Builder doSnapshot(boolean doSnapshot) {
-            this.doSnapshot = doSnapshot;
-            return this;
-        }
-
-        @Override
         public Builder jdbcMetadataConnection(PostgresConnection jdbcConnection) {
             this.jdbcConnection = jdbcConnection;
             return this;
@@ -911,7 +876,6 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
                     publicationAutocreateMode,
                     plugin,
                     dropSlotOnClose,
-                    doSnapshot,
                     statusUpdateIntervalVal,
                     jdbcConnection,
                     typeRegistry,

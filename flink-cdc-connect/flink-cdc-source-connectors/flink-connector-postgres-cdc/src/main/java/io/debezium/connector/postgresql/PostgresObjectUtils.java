@@ -23,7 +23,7 @@ import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.connector.postgresql.connection.ReplicationConnection;
 import io.debezium.connector.postgresql.spi.SlotState;
 import io.debezium.relational.TableId;
-import io.debezium.schema.TopicSelector;
+import io.debezium.spi.topic.TopicNamingStrategy;
 import io.debezium.util.Clock;
 import io.debezium.util.Metronome;
 import org.slf4j.Logger;
@@ -45,16 +45,14 @@ public class PostgresObjectUtils {
     public static PostgresSchema newSchema(
             PostgresConnection connection,
             PostgresConnectorConfig config,
-            TypeRegistry typeRegistry,
-            TopicSelector<TableId> topicSelector,
+            TopicNamingStrategy<TableId> topicNamingStrategy,
             PostgresValueConverter valueConverter)
             throws SQLException {
         PostgresSchema schema =
                 new PostgresSchema(
                         config,
-                        typeRegistry,
                         connection.getDefaultValueConverter(),
-                        topicSelector,
+                        topicNamingStrategy,
                         valueConverter);
         schema.refresh(connection, false);
         return schema;
@@ -63,8 +61,8 @@ public class PostgresObjectUtils {
     public static PostgresTaskContext newTaskContext(
             PostgresConnectorConfig connectorConfig,
             PostgresSchema schema,
-            TopicSelector<TableId> topicSelector) {
-        return new PostgresTaskContext(connectorConfig, schema, topicSelector);
+            TopicNamingStrategy<TableId> topicNamingStrategy) {
+        return new PostgresTaskContext(connectorConfig, schema, topicNamingStrategy);
     }
 
     public static PostgresEventMetadataProvider newEventMetadataProvider() {
@@ -88,14 +86,13 @@ public class PostgresObjectUtils {
     // io.debezium.connector.postgresql.PostgresConnectorTask.createReplicationConnection.
     // pass connectorConfig instead of maxRetries and retryDelay as parameters.
     // - old: ReplicationConnection createReplicationConnection(PostgresTaskContext taskContext,
-    // boolean doSnapshot, int maxRetries, Duration retryDelay)
+    // int maxRetries, Duration retryDelay)
     // - new: ReplicationConnection createReplicationConnection(PostgresTaskContext taskContext,
-    // PostgresConnection postgresConnection, boolean doSnapshot, PostgresConnectorConfig
+    // PostgresConnection postgresConnection, PostgresConnectorConfig
     // connectorConfig)
     public static ReplicationConnection createReplicationConnection(
             PostgresTaskContext taskContext,
             PostgresConnection postgresConnection,
-            boolean doSnapshot,
             PostgresConnectorConfig connectorConfig) {
         int maxRetries = connectorConfig.maxRetries();
         Duration retryDelay = connectorConfig.retryDelay();
@@ -105,7 +102,7 @@ public class PostgresObjectUtils {
         while (retryCount <= maxRetries) {
             try {
                 LOGGER.info("Creating a new replication connection for {}", taskContext);
-                return taskContext.createReplicationConnection(doSnapshot, postgresConnection);
+                return taskContext.createReplicationConnection(postgresConnection);
             } catch (SQLException ex) {
                 retryCount++;
                 if (retryCount > maxRetries) {

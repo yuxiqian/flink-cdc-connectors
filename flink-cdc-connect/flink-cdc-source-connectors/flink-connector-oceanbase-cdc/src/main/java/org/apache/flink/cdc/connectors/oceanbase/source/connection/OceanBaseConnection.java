@@ -273,7 +273,8 @@ public class OceanBaseConnection extends JdbcConnection {
             // Then define the table ...
             List<Column> columns = tableEntry.getValue();
             Collections.sort(columns);
-            tables.overwriteTable(tableEntry.getKey(), columns, pkColumnNames, null);
+            tables.overwriteTable(
+                    tableEntry.getKey(), columns, pkColumnNames, null, Collections.emptyList());
         }
 
         if (removeTablesNotFoundInJdbc) {

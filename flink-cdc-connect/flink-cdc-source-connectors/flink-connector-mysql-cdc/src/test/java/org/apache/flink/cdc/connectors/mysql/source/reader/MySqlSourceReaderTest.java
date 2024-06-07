@@ -136,7 +136,7 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
             Map<TableId, TableChanges.TableChange> tableSchemas =
                     TableDiscoveryUtils.discoverSchemaForCapturedTables(
                             new MySqlPartition(
-                                    sourceConfig.getMySqlConnectorConfig().getLogicalName()),
+                                    sourceConfig.getMySqlConnectorConfig().getLogicalName(), null),
                             sourceConfig,
                             jdbc);
             TableId tableId0 = new TableId(customerDatabase.getDatabaseName(), null, "customers");
@@ -242,7 +242,7 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
             Map<TableId, TableChanges.TableChange> tableSchemas =
                     TableDiscoveryUtils.discoverSchemaForCapturedTables(
                             new MySqlPartition(
-                                    sourceConfig.getMySqlConnectorConfig().getLogicalName()),
+                                    sourceConfig.getMySqlConnectorConfig().getLogicalName(), null),
                             sourceConfig,
                             jdbc);
             TableId tableId = new TableId(customerDatabase.getDatabaseName(), null, "customers");
@@ -343,7 +343,7 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
             Map<TableId, TableChanges.TableChange> tableSchemas =
                     TableDiscoveryUtils.discoverSchemaForCapturedTables(
                             new MySqlPartition(
-                                    sourceConfig.getMySqlConnectorConfig().getLogicalName()),
+                                    sourceConfig.getMySqlConnectorConfig().getLogicalName(), null),
                             sourceConfig,
                             jdbc);
             binlogSplit =

@@ -18,7 +18,7 @@
 package org.apache.flink.cdc.connectors.base.experimental.config;
 
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfigFactory;
-import org.apache.flink.cdc.connectors.base.experimental.EmbeddedFlinkDatabaseHistory;
+import org.apache.flink.cdc.connectors.base.experimental.EmbeddedFlinkSchemaHistory;
 
 import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
@@ -67,8 +67,7 @@ public class MySqlSourceConfigFactory extends JdbcSourceConfigFactory {
         props.setProperty("database.responseBuffering", "adaptive");
         props.setProperty("database.serverTimezone", serverTimeZone);
         // database history
-        props.setProperty(
-                "database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
+        props.setProperty("database.history", EmbeddedFlinkSchemaHistory.class.getCanonicalName());
         props.setProperty("database.history.instance.name", UUID.randomUUID() + "_" + subtaskId);
         props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
         props.setProperty("database.history.refer.ddl", String.valueOf(true));

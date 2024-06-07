@@ -19,7 +19,7 @@ package org.apache.flink.cdc.connectors.postgres.source.fetch;
 
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
-import org.apache.flink.cdc.connectors.base.source.EmbeddedFlinkDatabaseHistory;
+import org.apache.flink.cdc.connectors.base.source.EmbeddedFlinkSchemaHistory;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
@@ -33,6 +33,7 @@ import org.apache.flink.cdc.connectors.postgres.source.offset.PostgresOffsetUtil
 import org.apache.flink.cdc.connectors.postgres.source.utils.ChunkUtils;
 import org.apache.flink.table.types.logical.RowType;
 
+import io.debezium.DebeziumException;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
 import io.debezium.connector.postgresql.PostgresErrorHandler;
@@ -42,12 +43,12 @@ import io.debezium.connector.postgresql.PostgresOffsetContext;
 import io.debezium.connector.postgresql.PostgresPartition;
 import io.debezium.connector.postgresql.PostgresSchema;
 import io.debezium.connector.postgresql.PostgresTaskContext;
-import io.debezium.connector.postgresql.PostgresTopicSelector;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.connector.postgresql.connection.ReplicationConnection;
 import io.debezium.connector.postgresql.spi.Snapshotter;
 import io.debezium.data.Envelope;
 import io.debezium.heartbeat.Heartbeat;
+import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.metrics.DefaultChangeEventSourceMetricsFactory;
@@ -58,8 +59,9 @@ import io.debezium.relational.Column;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
-import io.debezium.schema.TopicSelector;
+import io.debezium.spi.topic.TopicNamingStrategy;
 import org.apache.kafka.connect.data.Struct;
+import org.apache.kafka.connect.errors.RetriableException;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -165,11 +167,12 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                 new PostgresConnection(
                         dbzConfig.getJdbcConfig(), valueConverterBuilder, CONNECTION_NAME);
 
-        TopicSelector<TableId> topicSelector = PostgresTopicSelector.create(dbzConfig);
-        EmbeddedFlinkDatabaseHistory.registerHistory(
+        TopicNamingStrategy<TableId> topicNamingStrategy =
+                dbzConfig.getTopicNamingStrategy(PostgresConnectorConfig.TOPIC_NAMING_STRATEGY);
+        EmbeddedFlinkSchemaHistory.registerHistory(
                 sourceConfig
                         .getDbzConfiguration()
-                        .getString(EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME),
+                        .getString(EmbeddedFlinkSchemaHistory.DATABASE_HISTORY_INSTANCE_NAME),
                 sourceSplitBase.getTableSchemas().values());
 
         try {
@@ -177,8 +180,7 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                     PostgresObjectUtils.newSchema(
                             jdbcConnection,
                             dbzConfig,
-                            jdbcConnection.getTypeRegistry(),
-                            topicSelector,
+                            topicNamingStrategy,
                             valueConverterBuilder.build(jdbcConnection.getTypeRegistry()));
         } catch (SQLException e) {
             throw new RuntimeException("Failed to initialize PostgresSchema", e);
@@ -187,16 +189,13 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         this.offsetContext =
                 loadStartingOffsetState(
                         new PostgresOffsetContext.Loader(dbzConfig), sourceSplitBase);
-        this.partition = new PostgresPartition(dbzConfig.getLogicalName());
-        this.taskContext = PostgresObjectUtils.newTaskContext(dbzConfig, schema, topicSelector);
+        this.partition = new PostgresPartition(dbzConfig.getLogicalName(), null);
+        this.taskContext =
+                PostgresObjectUtils.newTaskContext(dbzConfig, schema, topicNamingStrategy);
 
         if (replicationConnection == null) {
             replicationConnection =
-                    createReplicationConnection(
-                            this.taskContext,
-                            jdbcConnection,
-                            this.snapShotter.shouldSnapshot(),
-                            dbzConfig);
+                    createReplicationConnection(this.taskContext, jdbcConnection, dbzConfig);
         }
 
         this.queue =
@@ -218,7 +217,7 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         this.dispatcher =
                 new JdbcSourceEventDispatcher<>(
                         dbzConfig,
-                        topicSelector,
+                        topicNamingStrategy,
                         schema,
                         queue,
                         dbzConfig.getTableFilters().dataCollectionFilter(),
@@ -227,15 +226,47 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                         schemaNameAdjuster,
                         new PostgresSchemaChangeEventHandler());
 
+        final JdbcConfiguration jdbcConfiguration = dbzConfig.getJdbcConfig();
         this.postgresDispatcher =
                 new PostgresEventDispatcher<>(
                         dbzConfig,
-                        topicSelector,
+                        topicNamingStrategy,
                         schema,
                         queue,
                         dbzConfig.getTableFilters().dataCollectionFilter(),
                         DataChangeEvent::new,
+                        null,
                         metadataProvider,
+                        dbzConfig.createHeartbeat(
+                                topicNamingStrategy,
+                                schemaNameAdjuster,
+                                () ->
+                                        new PostgresConnection(
+                                                jdbcConfiguration,
+                                                PostgresConnection.CONNECTION_GENERAL),
+                                exception -> {
+                                    String sqlErrorId = exception.getSQLState();
+                                    switch (sqlErrorId) {
+                                        case "57P01":
+                                            // Postgres error admin_shutdown, see
+                                            // https://www.postgresql.org/docs/12/errcodes-appendix.html
+                                            throw new DebeziumException(
+                                                    "Could not execute heartbeat action query (Error: "
+                                                            + sqlErrorId
+                                                            + ")",
+                                                    exception);
+                                        case "57P03":
+                                            // Postgres error cannot_connect_now, see
+                                            // https://www.postgresql.org/docs/12/errcodes-appendix.html
+                                            throw new RetriableException(
+                                                    "Could not execute heartbeat action query (Error: "
+                                                            + sqlErrorId
+                                                            + ")",
+                                                    exception);
+                                        default:
+                                            break;
+                                    }
+                                }),
                         schemaNameAdjuster);
 
         ChangeEventSourceMetricsFactory<PostgresPartition> metricsFactory =

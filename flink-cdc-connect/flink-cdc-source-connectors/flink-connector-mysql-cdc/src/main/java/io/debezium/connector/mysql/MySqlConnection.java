@@ -13,15 +13,14 @@ import io.debezium.config.CommonConnectorConfig.EventProcessingFailureHandlingMo
 import io.debezium.config.Configuration;
 import io.debezium.config.Configuration.Builder;
 import io.debezium.config.Field;
+import io.debezium.connector.mysql.MySqlConnection.DatabaseLocales;
 import io.debezium.connector.mysql.MySqlConnectorConfig.SecureConnectionMode;
-import io.debezium.connector.mysql.legacy.MySqlJdbcContext.DatabaseLocales;
 import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.Column;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
-import io.debezium.relational.history.DatabaseHistory;
-import io.debezium.schema.DatabaseSchema;
+import io.debezium.relational.history.SchemaHistory;
 import io.debezium.util.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -589,10 +588,10 @@ public class MySqlConnection extends JdbcConnection {
                     config.filter(
                                     x ->
                                             !(x.startsWith(
-                                                            DatabaseHistory
+                                                            SchemaHistory
                                                                     .CONFIGURATION_FIELD_PREFIX_STRING)
                                                     || x.equals(
-                                                            MySqlConnectorConfig.DATABASE_HISTORY
+                                                            MySqlConnectorConfig.SCHEMA_HISTORY
                                                                     .name())))
                             .edit()
                             .withDefault(
@@ -759,8 +758,7 @@ public class MySqlConnection extends JdbcConnection {
     }
 
     @Override
-    public <T extends DatabaseSchema<TableId>> Object getColumnValue(
-            ResultSet rs, int columnIndex, Column column, Table table, T schema)
+    public Object getColumnValue(ResultSet rs, int columnIndex, Column column, Table table)
             throws SQLException {
         return mysqlFieldReader.readField(rs, columnIndex, column, table);
     }
@@ -768,5 +766,30 @@ public class MySqlConnection extends JdbcConnection {
     @Override
     public String quotedTableIdString(TableId tableId) {
         return tableId.toQuotedString('`');
+    }
+
+    public static class DatabaseLocales {
+        private final String charset;
+        private final String collation;
+
+        public DatabaseLocales(String charset, String collation) {
+            this.charset = charset;
+            this.collation = collation;
+        }
+
+        public void appendToDdlStatement(String dbName, StringBuilder ddl) {
+            if (charset != null) {
+                LOGGER.debug("Setting default charset '{}' for database '{}'", charset, dbName);
+                ddl.append(" CHARSET ").append(charset);
+            } else {
+                LOGGER.info("Default database charset for '{}' not found", dbName);
+            }
+            if (collation != null) {
+                LOGGER.debug("Setting default collation '{}' for database '{}'", collation, dbName);
+                ddl.append(" COLLATE ").append(collation);
+            } else {
+                LOGGER.info("Default database collation for '{}' not found", dbName);
+            }
+        }
     }
 }

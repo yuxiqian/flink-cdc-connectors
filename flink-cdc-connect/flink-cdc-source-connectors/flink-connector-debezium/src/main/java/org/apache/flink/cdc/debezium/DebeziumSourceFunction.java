@@ -32,8 +32,8 @@ import org.apache.flink.cdc.debezium.internal.DebeziumChangeFetcher;
 import org.apache.flink.cdc.debezium.internal.DebeziumOffset;
 import org.apache.flink.cdc.debezium.internal.DebeziumOffsetSerializer;
 import org.apache.flink.cdc.debezium.internal.FlinkDatabaseHistory;
-import org.apache.flink.cdc.debezium.internal.FlinkDatabaseSchemaHistory;
 import org.apache.flink.cdc.debezium.internal.FlinkOffsetBackingStore;
+import org.apache.flink.cdc.debezium.internal.FlinkSchemaHistory;
 import org.apache.flink.cdc.debezium.internal.Handover;
 import org.apache.flink.cdc.debezium.internal.SchemaRecord;
 import org.apache.flink.configuration.Configuration;
@@ -73,8 +73,8 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.flink.cdc.debezium.internal.Handover.ClosedException.isGentlyClosedException;
-import static org.apache.flink.cdc.debezium.utils.DatabaseHistoryUtil.registerHistory;
-import static org.apache.flink.cdc.debezium.utils.DatabaseHistoryUtil.retrieveHistory;
+import static org.apache.flink.cdc.debezium.utils.SchemaHistoryUtil.registerHistory;
+import static org.apache.flink.cdc.debezium.utils.SchemaHistoryUtil.retrieveHistory;
 
 /**
  * The {@link DebeziumSourceFunction} is a streaming data source that pulls captured change data
@@ -173,7 +173,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
      * State to store the history records, i.e. schema changes.
      *
      * @see FlinkDatabaseHistory
-     * @see FlinkDatabaseSchemaHistory
+     * @see FlinkSchemaHistory
      */
     private transient ListState<String> schemaRecordsState;
 
@@ -576,9 +576,9 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
                 throw new IllegalStateException(
                         "The configured option 'debezium.internal.implementation' is 'legacy', but the state of source is incompatible with this implementation, you should remove the the option.");
             }
-        } else if (FlinkDatabaseSchemaHistory.isCompatible(retrieveHistory(engineInstanceName))) {
+        } else if (FlinkSchemaHistory.isCompatible(retrieveHistory(engineInstanceName))) {
             // tries the non-legacy first
-            return FlinkDatabaseSchemaHistory.class;
+            return FlinkSchemaHistory.class;
         } else if (isCompatibleWithLegacy) {
             // fallback to legacy if possible
             return FlinkDatabaseHistory.class;

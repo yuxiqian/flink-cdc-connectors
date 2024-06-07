@@ -178,13 +178,12 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
     }
 
     @Override
-    public Scn process(OraclePartition partition, Scn startScn, Scn endScn)
-            throws SQLException, InterruptedException {
+    public Scn process(Scn startScn, Scn endScn) throws SQLException, InterruptedException {
         counters.reset();
 
         try (PreparedStatement statement = createQueryStatement()) {
             LOGGER.debug("Fetching results for SCN [{}, {}]", startScn, endScn);
-            statement.setFetchSize(getConfig().getLogMiningViewFetchSize());
+            statement.setFetchSize(getConfig().getQueryFetchSize());
             statement.setFetchDirection(ResultSet.FETCH_FORWARD);
             statement.setString(1, startScn.toString());
             statement.setString(2, endScn.toString());
@@ -489,7 +488,8 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
 
         offsetContext.setEventScn(commitScn);
         if (getTransactionEventCount(transaction) > 0 && !skipExcludedUserName) {
-            dispatcher.dispatchTransactionCommittedEvent(partition, offsetContext);
+            dispatcher.dispatchTransactionCommittedEvent(
+                    partition, offsetContext, transaction.getChangeTime());
         } else {
             dispatcher.dispatchHeartbeatEvent(partition, offsetContext);
         }
@@ -1050,10 +1050,7 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
         // results.
         // This should have negligible overhead since this use case should happen rarely.
         try (OracleConnection connection =
-                new OracleConnection(
-                        connectorConfig.getJdbcConfig(),
-                        () -> getClass().getClassLoader(),
-                        false)) {
+                new OracleConnection(connectorConfig.getJdbcConfig(), false)) {
             connection.setAutoCommit(false);
             final String pdbName = getConfig().getPdbName();
             if (pdbName != null) {

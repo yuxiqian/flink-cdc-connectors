@@ -46,6 +46,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -157,7 +158,7 @@ public class PostgresStreamFetchTask implements FetchTask<SourceSplitBase> {
                         "Committing offset {} for {}",
                         Lsn.valueOf(lastCommitLsn),
                         streamSplitReadTask.streamSplit);
-                streamSplitReadTask.commitOffset(offsets);
+                streamSplitReadTask.commitOffset(Collections.emptyMap(), offsets);
             }
         }
     }

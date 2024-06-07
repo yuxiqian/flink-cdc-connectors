@@ -48,7 +48,6 @@ public class OceanBaseConnectorConfig extends RelationalDatabaseConnectorConfig 
             String compatibleMode, String serverTimeZone, Properties properties) {
         super(
                 Configuration.from(properties),
-                LOGICAL_NAME,
                 Tables.TableFilter.fromPredicate(
                         tableId ->
                                 "mysql".equalsIgnoreCase(compatibleMode)
@@ -58,7 +57,8 @@ public class OceanBaseConnectorConfig extends RelationalDatabaseConnectorConfig 
                 DEFAULT_SNAPSHOT_FETCH_SIZE,
                 "mysql".equalsIgnoreCase(compatibleMode)
                         ? ColumnFilterMode.CATALOG
-                        : ColumnFilterMode.SCHEMA);
+                        : ColumnFilterMode.SCHEMA,
+                false);
         this.compatibleMode = compatibleMode;
         this.serverTimeZone = serverTimeZone;
     }

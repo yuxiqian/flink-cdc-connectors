@@ -29,9 +29,7 @@ import io.debezium.relational.history.TableChanges.TableChange;
 
 import java.sql.SQLException;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 
 /** A component used to get schema by table path. */
 public class OracleSchema {
@@ -58,16 +56,14 @@ public class OracleSchema {
 
     private TableChange readTableSchema(JdbcConnection jdbc, TableId tableId) {
         OracleConnection oracleConnection = (OracleConnection) jdbc;
-        Set<TableId> tableIdSet = new HashSet<>();
-        tableIdSet.add(tableId);
 
         final Map<TableId, TableChange> tableChangeMap = new HashMap<>();
         Tables tables = new Tables();
         tables.overwriteTable(tables.editOrCreateTable(tableId).create());
 
         try {
-            oracleConnection.readSchemaForCapturedTables(
-                    tables, tableId.catalog(), tableId.schema(), null, false, tableIdSet);
+            oracleConnection.readSchema(
+                    tables, tableId.catalog(), tableId.schema(), null, null, false);
             Table table = tables.forTable(tableId);
             TableChange tableChange = new TableChange(TableChanges.TableChangeType.CREATE, table);
             tableChangeMap.put(tableId, tableChange);

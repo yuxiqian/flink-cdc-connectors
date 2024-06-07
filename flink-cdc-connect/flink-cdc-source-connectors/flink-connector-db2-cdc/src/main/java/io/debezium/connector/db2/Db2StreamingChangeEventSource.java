@@ -371,6 +371,7 @@ public class Db2StreamingChangeEventSource
                         offsetContext,
                         newTable,
                         metadataConnection.getTableSchemaFromTable(newTable),
+                        schema,
                         SchemaChangeEventType.ALTER));
     }
 
@@ -456,6 +457,7 @@ public class Db2StreamingChangeEventSource
                                 offsetContext,
                                 currentTable,
                                 dataConnection.getTableSchemaFromTable(currentTable),
+                                schema,
                                 SchemaChangeEventType.CREATE));
             }
             tables.add(currentTable);

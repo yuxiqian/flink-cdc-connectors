@@ -19,7 +19,7 @@ package org.apache.flink.cdc.connectors.sqlserver.source.reader.fetch;
 
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
-import org.apache.flink.cdc.connectors.base.source.EmbeddedFlinkDatabaseHistory;
+import org.apache.flink.cdc.connectors.base.source.EmbeddedFlinkSchemaHistory;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.reader.external.JdbcSourceFetchTaskContext;
@@ -41,7 +41,6 @@ import io.debezium.connector.sqlserver.SqlServerOffsetContext;
 import io.debezium.connector.sqlserver.SqlServerOffsetContext.Loader;
 import io.debezium.connector.sqlserver.SqlServerPartition;
 import io.debezium.connector.sqlserver.SqlServerTaskContext;
-import io.debezium.connector.sqlserver.SqlServerTopicSelector;
 import io.debezium.data.Envelope.FieldName;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.ErrorHandler;
@@ -55,10 +54,10 @@ import io.debezium.relational.Column;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables.TableFilter;
-import io.debezium.schema.DataCollectionId;
-import io.debezium.schema.TopicSelector;
+import io.debezium.schema.SchemaNameAdjuster;
+import io.debezium.spi.schema.DataCollectionId;
+import io.debezium.spi.topic.TopicNamingStrategy;
 import io.debezium.util.Collect;
-import io.debezium.util.SchemaNameAdjuster;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
@@ -92,7 +91,7 @@ public class SqlServerSourceFetchTaskContext extends JdbcSourceFetchTaskContext 
     private SqlServerErrorHandler errorHandler;
     private ChangeEventQueue<DataChangeEvent> queue;
     private SqlServerTaskContext taskContext;
-    private TopicSelector<TableId> topicSelector;
+    private TopicNamingStrategy<TableId> topicNamingStrategy;
     private EventDispatcher.SnapshotReceiver<SqlServerPartition> snapshotReceiver;
     private SnapshotChangeEventSourceMetrics<SqlServerPartition> snapshotChangeEventSourceMetrics;
     private StreamingChangeEventSourceMetrics<SqlServerPartition> streamingChangeEventSourceMetrics;
@@ -112,11 +111,13 @@ public class SqlServerSourceFetchTaskContext extends JdbcSourceFetchTaskContext 
     public void configure(SourceSplitBase sourceSplitBase) {
         // initial stateful objects
         final SqlServerConnectorConfig connectorConfig = getDbzConnectorConfig();
-        this.topicSelector = SqlServerTopicSelector.defaultSelector(connectorConfig);
-        EmbeddedFlinkDatabaseHistory.registerHistory(
+        this.topicNamingStrategy =
+                connectorConfig.getTopicNamingStrategy(
+                        SqlServerConnectorConfig.TOPIC_NAMING_STRATEGY);
+        EmbeddedFlinkSchemaHistory.registerHistory(
                 sourceConfig
                         .getDbzConfiguration()
-                        .getString(EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME),
+                        .getString(EmbeddedFlinkSchemaHistory.DATABASE_HISTORY_INSTANCE_NAME),
                 sourceSplitBase.getTableSchemas().values());
 
         this.databaseSchema =
@@ -125,7 +126,7 @@ public class SqlServerSourceFetchTaskContext extends JdbcSourceFetchTaskContext 
 
         String serverName = connectorConfig.getLogicalName();
         String dbName = connectorConfig.getJdbcConfig().getDatabase();
-        this.partition = new SqlServerPartition(serverName, dbName, false);
+        this.partition = new SqlServerPartition(serverName, dbName);
 
         validateAndLoadDatabaseHistory(offsetContext, databaseSchema);
 
@@ -148,7 +149,7 @@ public class SqlServerSourceFetchTaskContext extends JdbcSourceFetchTaskContext 
         this.dispatcher =
                 new JdbcSourceEventDispatcher<>(
                         connectorConfig,
-                        topicSelector,
+                        topicNamingStrategy,
                         databaseSchema,
                         queue,
                         connectorConfig.getTableFilters().dataCollectionFilter(),

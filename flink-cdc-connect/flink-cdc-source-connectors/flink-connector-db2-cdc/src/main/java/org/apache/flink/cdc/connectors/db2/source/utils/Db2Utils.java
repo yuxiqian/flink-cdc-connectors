@@ -26,15 +26,15 @@ import org.apache.flink.util.FlinkRuntimeException;
 import io.debezium.connector.db2.Db2Connection;
 import io.debezium.connector.db2.Db2ConnectorConfig;
 import io.debezium.connector.db2.Db2DatabaseSchema;
-import io.debezium.connector.db2.Db2TopicSelector;
+import io.debezium.connector.db2.Db2ValueConverters;
 import io.debezium.connector.db2.Lsn;
 import io.debezium.connector.db2.SourceInfo;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.Column;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
-import io.debezium.schema.TopicSelector;
-import io.debezium.util.SchemaNameAdjuster;
+import io.debezium.schema.SchemaNameAdjuster;
+import io.debezium.spi.topic.TopicNamingStrategy;
 import org.apache.kafka.connect.source.SourceRecord;
 
 import javax.annotation.Nullable;
@@ -271,11 +271,16 @@ public class Db2Utils {
 
     public static Db2DatabaseSchema createDb2DatabaseSchema(
             Db2ConnectorConfig connectorConfig, Db2Connection connection) {
-        TopicSelector<TableId> topicSelector = Db2TopicSelector.defaultSelector(connectorConfig);
+        TopicNamingStrategy<TableId> topicNamingStrategy =
+                connectorConfig.getTopicNamingStrategy(Db2ConnectorConfig.TOPIC_NAMING_STRATEGY);
         SchemaNameAdjuster schemaNameAdjuster = SchemaNameAdjuster.create();
 
         return new Db2DatabaseSchema(
-                connectorConfig, schemaNameAdjuster, topicSelector, connection);
+                connectorConfig,
+                new Db2ValueConverters(),
+                schemaNameAdjuster,
+                topicNamingStrategy,
+                connection);
     }
 
     // --------------------------private method-------------------------------

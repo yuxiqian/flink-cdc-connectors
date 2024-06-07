@@ -20,6 +20,7 @@ import io.debezium.util.Metronome;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
@@ -262,9 +263,7 @@ public class SqlServerStreamingChangeEventSource
                                 for (int i = 0; i < tableCount; i++) {
                                     changeTables[i] =
                                             new SqlServerChangeTablePointer(
-                                                    tables[i],
-                                                    resultSets[i],
-                                                    connectorConfig.getSourceTimestampMode());
+                                                    tables[i], resultSets[i]);
                                     changeTables[i].next();
                                 }
 
@@ -419,17 +418,19 @@ public class SqlServerStreamingChangeEventSource
                                                     ? tableWithSmallestLsn.getData()
                                                     : null;
 
+                                    final ResultSet resultSet = tableWithSmallestLsn.getResultSet();
                                     offsetContext.setChangePosition(
                                             tableWithSmallestLsn.getChangePosition(), eventCount);
                                     offsetContext.event(
                                             tableWithSmallestLsn
                                                     .getChangeTable()
                                                     .getSourceTableId(),
-                                            connectorConfig
-                                                    .getSourceTimestampMode()
+                                            resultSet
                                                     .getTimestamp(
-                                                            clock,
-                                                            tableWithSmallestLsn.getResultSet()));
+                                                            resultSet
+                                                                    .getMetaData()
+                                                                    .getColumnCount())
+                                                    .toInstant());
 
                                     dispatcher.dispatchDataChangeEvent(
                                             partition,
@@ -440,7 +441,8 @@ public class SqlServerStreamingChangeEventSource
                                                     operation,
                                                     data,
                                                     dataNext,
-                                                    clock));
+                                                    clock,
+                                                    connectorConfig.skipMessagesWithoutChange()));
                                     tableWithSmallestLsn.next();
                                 }
                             });
@@ -496,6 +498,7 @@ public class SqlServerStreamingChangeEventSource
                         offsetContext,
                         newTable,
                         tableSchema,
+                        schema,
                         SchemaChangeEventType.ALTER));
         newTable.setSourceTable(tableSchema);
     }
@@ -586,6 +589,7 @@ public class SqlServerStreamingChangeEventSource
                                 offsetContext,
                                 currentTable,
                                 dataConnection.getTableSchemaFromTable(databaseName, currentTable),
+                                schema,
                                 SchemaChangeEventType.CREATE));
             }
 
