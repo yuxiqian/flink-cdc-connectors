@@ -308,12 +308,11 @@ public class MySqlSourceConfigFactory implements Serializable {
         props.setProperty("database.fetchSize", String.valueOf(fetchSize));
         props.setProperty("database.responseBuffering", "adaptive");
         props.setProperty("database.serverTimezone", serverTimeZone);
-        // database history
-        props.setProperty("database.history", EmbeddedFlinkSchemaHistory.class.getCanonicalName());
-        props.setProperty(
-                "database.history.instance.name", UUID.randomUUID().toString() + "_" + subtaskId);
-        props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
-        props.setProperty("database.history.refer.ddl", String.valueOf(true));
+        // schema history
+        props.setProperty("schema.history", EmbeddedFlinkSchemaHistory.class.getCanonicalName());
+        props.setProperty("schema.history.instance.name", UUID.randomUUID() + "_" + subtaskId);
+        props.setProperty("schema.history.skip.unparseable.ddl", String.valueOf(true));
+        props.setProperty("schema.history.refer.ddl", String.valueOf(true));
         props.setProperty("connect.timeout.ms", String.valueOf(connectTimeout.toMillis()));
         // the underlying debezium reader should always capture the schema changes and forward them.
         // Note: the includeSchemaChanges parameter is used to control emitting the schema record,
@@ -328,6 +327,7 @@ public class MySqlSourceConfigFactory implements Serializable {
         // but it'll cause lose of precise when the value is larger than 2^63,
         // so use "precise" mode to avoid it.
         props.put("bigint.unsigned.handling.mode", "precise");
+        props.put("topic.prefix", serverName);
 
         if (serverIdRange != null) {
             int serverId = serverIdRange.getServerId(subtaskId);

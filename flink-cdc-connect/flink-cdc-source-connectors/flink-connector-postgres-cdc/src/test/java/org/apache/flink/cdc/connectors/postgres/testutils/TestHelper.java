@@ -25,7 +25,7 @@ import io.debezium.relational.RelationalDatabaseConnectorConfig;
 /** A helper class for testing. */
 public class TestHelper {
 
-    private static final String TOPIC_PREFIX = "test_server";
+    private static final String DEFAULT_TOPIC_PREFIX = "test_server";
 
     private static final String TEST_PROPERTY_PREFIX = "debezium.test.";
 
@@ -49,7 +49,7 @@ public class TestHelper {
         JdbcConfiguration jdbcConfiguration = defaultJdbcConfig();
         Configuration.Builder builder = Configuration.create();
         jdbcConfiguration.forEach((field, value) -> builder.with("database." + field, value));
-        builder.with(RelationalDatabaseConnectorConfig.TOPIC_PREFIX, TOPIC_PREFIX)
+        builder.with(RelationalDatabaseConnectorConfig.TOPIC_PREFIX, DEFAULT_TOPIC_PREFIX)
                 .with(PostgresConnectorConfig.DROP_SLOT_ON_STOP, true)
                 .with(PostgresConnectorConfig.STATUS_UPDATE_INTERVAL_MS, 100)
                 .with(PostgresConnectorConfig.PLUGIN_NAME, "decoderbufs")

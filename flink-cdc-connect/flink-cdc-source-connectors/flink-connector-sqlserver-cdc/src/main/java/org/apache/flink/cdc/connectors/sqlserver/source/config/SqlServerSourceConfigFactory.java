@@ -58,6 +58,7 @@ public class SqlServerSourceConfigFactory extends JdbcSourceConfigFactory {
         props.setProperty("database.port", String.valueOf(port));
         props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
         props.setProperty("database.dbname", checkNotNull(databaseList.get(0)));
+        props.setProperty("database.encrypt", String.valueOf(false));
 
         if (tableList != null) {
             props.setProperty("table.include.list", String.join(",", tableList));
