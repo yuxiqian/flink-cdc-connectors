@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.testutils.schema;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
+import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 
 import java.time.Duration;
@@ -75,13 +76,15 @@ public class CollectingMetadataApplier implements MetadataApplier {
     }
 
     @Override
-    public void applySchemaChange(SchemaChangeEvent schemaChangeEvent) {
+    public void applySchemaChange(SchemaChangeEvent schemaChangeEvent)
+            throws SchemaEvolveException {
         schemaChangeEvents.add(schemaChangeEvent);
         if (duration != null) {
             try {
                 Thread.sleep(duration.toMillis());
                 if (errorsOnEventTypes.contains(schemaChangeEvent.getType())) {
-                    throw new RuntimeException("Dummy metadata apply exception for test.");
+                    throw new SchemaEvolveException(
+                            schemaChangeEvent, "Dummy metadata apply exception for test.", null);
                 }
             } catch (InterruptedException ignore) {
                 // Ignores sleep interruption
