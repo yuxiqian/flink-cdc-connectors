@@ -31,6 +31,7 @@ import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -1036,7 +1037,7 @@ public class SchemaEvolveTest {
                                                 Column.physicalColumn(
                                                         "height", DOUBLE, "Height data")))));
         Assertions.assertThatThrownBy(() -> processEvent(schemaOperator, addColumnEvents))
-                .isExactlyInstanceOf(RuntimeException.class)
+                .isExactlyInstanceOf(SchemaEvolveException.class)
                 .hasMessageContaining("Failed to apply schema change");
         harness.close();
     }
