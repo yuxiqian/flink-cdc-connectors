@@ -25,6 +25,8 @@ import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
+import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.types.utils.DataTypeUtils;
@@ -114,7 +116,8 @@ public class PaimonMetadataApplier implements MetadataApplier {
     }
 
     @Override
-    public void applySchemaChange(SchemaChangeEvent schemaChangeEvent) {
+    public void applySchemaChange(SchemaChangeEvent schemaChangeEvent)
+            throws SchemaEvolveException {
         if (catalog == null) {
             catalog = FlinkCatalogFactory.createPaimonCatalog(catalogOptions);
         }
@@ -130,11 +133,10 @@ public class PaimonMetadataApplier implements MetadataApplier {
             } else if (schemaChangeEvent instanceof AlterColumnTypeEvent) {
                 applyAlterColumn((AlterColumnTypeEvent) schemaChangeEvent);
             } else {
-                throw new UnsupportedOperationException(
-                        "PaimonDataSink doesn't support schema change event " + schemaChangeEvent);
+                throw new UnsupportedSchemaChangeEventException(schemaChangeEvent);
             }
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new SchemaEvolveException(schemaChangeEvent, "schema change applying failure", e);
         }
     }
 

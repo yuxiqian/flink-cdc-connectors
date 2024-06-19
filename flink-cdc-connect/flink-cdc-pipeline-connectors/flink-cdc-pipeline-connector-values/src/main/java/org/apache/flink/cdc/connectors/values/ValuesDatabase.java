@@ -28,6 +28,7 @@ import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
@@ -130,7 +131,8 @@ public class ValuesDatabase {
         }
 
         @Override
-        public void applySchemaChange(SchemaChangeEvent schemaChangeEvent) {
+        public void applySchemaChange(SchemaChangeEvent schemaChangeEvent)
+                throws SchemaEvolveException {
             if (schemaChangeEvent instanceof CreateTableEvent) {
                 TableId tableId = schemaChangeEvent.tableId();
                 if (!globalTables.containsKey(tableId)) {
@@ -140,10 +142,10 @@ public class ValuesDatabase {
                                     tableId, ((CreateTableEvent) schemaChangeEvent).getSchema()));
                 }
             } else {
-                throw new RuntimeException(
-                        String.format(
-                                "Rejected schema change event %s since error.on.schema.change is enabled.",
-                                schemaChangeEvent));
+                throw new SchemaEvolveException(
+                        schemaChangeEvent,
+                        "Rejected schema change event since error.on.schema.change is enabled.",
+                        null);
             }
         }
     }

@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.runtime.operators.schema.event.RefreshPendingListsResponse;
@@ -134,13 +135,13 @@ public class SchemaRegistryRequestHandler implements Closeable {
                     metadataApplier.applySchemaChange(changeEvent);
                     LOG.debug("Applied schema change {} to table {}.", changeEvent, tableId);
                     finishedSchemaChanges.add(changeEvent);
-                } catch (Throwable t) {
+                } catch (SchemaEvolveException e) {
                     LOG.error(
                             "Failed to apply schema change {} to table {}. Caused by: {}",
                             changeEvent,
                             tableId,
-                            t);
-                    failedSchemaChanges.add(Tuple2.of(changeEvent, t));
+                            e);
+                    failedSchemaChanges.add(Tuple2.of(changeEvent, e));
                 }
             }
         }

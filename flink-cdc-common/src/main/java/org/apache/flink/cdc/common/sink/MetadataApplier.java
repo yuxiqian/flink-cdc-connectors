@@ -20,6 +20,7 @@ package org.apache.flink.cdc.common.sink;
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
+import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 
 import java.io.Serializable;
 import java.util.Set;
@@ -35,5 +36,5 @@ public interface MetadataApplier extends Serializable {
     Set<SchemaChangeEventType> getSupportedSchemaEvolutionTypes();
 
     /** Apply the given {@link SchemaChangeEvent} to external systems. */
-    void applySchemaChange(SchemaChangeEvent schemaChangeEvent);
+    void applySchemaChange(SchemaChangeEvent schemaChangeEvent) throws SchemaEvolveException;
 }

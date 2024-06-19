@@ -31,6 +31,7 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
@@ -129,7 +130,7 @@ public class PaimonSinkITCase {
                 .dropDatabase(TEST_DATABASE, true, true);
     }
 
-    private List<Event> createTestEvents() {
+    private List<Event> createTestEvents() throws SchemaEvolveException {
         List<Event> testEvents = new ArrayList<>();
         // create table
         Schema schema =
@@ -171,7 +172,7 @@ public class PaimonSinkITCase {
     @ValueSource(strings = {"filesystem", "hive"})
     public void testSinkWithDataChange(String metastore)
             throws IOException, InterruptedException, Catalog.DatabaseNotEmptyException,
-                    Catalog.DatabaseNotExistException {
+                    Catalog.DatabaseNotExistException, SchemaEvolveException {
         initialize(metastore);
         PaimonSink<Event> paimonSink =
                 new PaimonSink<>(
@@ -257,7 +258,7 @@ public class PaimonSinkITCase {
     @ValueSource(strings = {"filesystem", "hive"})
     public void testSinkWithSchemaChange(String metastore)
             throws IOException, InterruptedException, Catalog.DatabaseNotEmptyException,
-                    Catalog.DatabaseNotExistException {
+                    Catalog.DatabaseNotExistException, SchemaEvolveException {
         initialize(metastore);
         PaimonSink<Event> paimonSink =
                 new PaimonSink(
@@ -392,7 +393,7 @@ public class PaimonSinkITCase {
     @ValueSource(strings = {"filesystem", "hive"})
     public void testSinkWithMultiTables(String metastore)
             throws IOException, InterruptedException, Catalog.DatabaseNotEmptyException,
-                    Catalog.DatabaseNotExistException {
+                    Catalog.DatabaseNotExistException, SchemaEvolveException {
         initialize(metastore);
         PaimonSink<Event> paimonSink =
                 new PaimonSink<>(

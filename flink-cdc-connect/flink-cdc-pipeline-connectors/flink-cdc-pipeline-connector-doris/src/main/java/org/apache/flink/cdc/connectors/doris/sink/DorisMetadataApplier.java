@@ -26,6 +26,8 @@ import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
+import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
@@ -97,7 +99,7 @@ public class DorisMetadataApplier implements MetadataApplier {
     }
 
     @Override
-    public void applySchemaChange(SchemaChangeEvent event) {
+    public void applySchemaChange(SchemaChangeEvent event) throws SchemaEvolveException {
         try {
             // send schema change op to doris
             if (event instanceof CreateTableEvent) {
@@ -109,11 +111,10 @@ public class DorisMetadataApplier implements MetadataApplier {
             } else if (event instanceof RenameColumnEvent) {
                 applyRenameColumnEvent((RenameColumnEvent) event);
             } else if (event instanceof AlterColumnTypeEvent) {
-                throw new RuntimeException("Unsupported schema change event, " + event);
+                throw new UnsupportedSchemaChangeEventException(event);
             }
         } catch (Exception ex) {
-            throw new RuntimeException(
-                    "Failed to schema change, " + event + ", reason: " + ex.getMessage());
+            throw new SchemaEvolveException(event, ex.getMessage(), null);
         }
     }
 
