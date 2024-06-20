@@ -319,7 +319,7 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
                                 "Failed to apply schema change event AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}.",
                                 schemaEvolveDatabase.getDatabaseName()),
                         String.format(
-                                "java.lang.RuntimeException: Rejected schema change event AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]} since error.on.schema.change is enabled.",
+                                "SchemaEvolveException{applyingEvent=AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}, problem='Rejected schema change event since error.on.schema.change is enabled.', context='null'}",
                                 schemaEvolveDatabase.getDatabaseName()),
                         "org.apache.flink.runtime.JobException: Recovery is suppressed by NoRestartBackoffTimeStrategy"),
                 jobManagerConsumer);
@@ -398,7 +398,7 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
 
         waitUntilSpecificEvent(
                 String.format(
-                        "Rejected schema change event AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]} since error.on.schema.change is enabled.",
+                        "SchemaEvolveException{applyingEvent=AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}, problem='Rejected schema change event since error.on.schema.change is enabled.', context='null'}",
                         schemaEvolveDatabase.getDatabaseName()),
                 jobManagerConsumer);
     }
