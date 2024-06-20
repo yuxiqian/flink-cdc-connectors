@@ -80,6 +80,7 @@ public class ValuesDataFactory implements DataSourceFactory, DataSinkFactory {
         options.add(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY);
         options.add(ValuesDataSinkOptions.PRINT_ENABLED);
         options.add(ValuesDataSinkOptions.SINK_API);
+        options.add(ValuesDataSinkOptions.ERROR_ON_SCHEMA_CHANGE);
         return options;
     }
 }
