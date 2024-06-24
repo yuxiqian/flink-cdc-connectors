@@ -245,11 +245,12 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         TableId tableId = event.tableId();
         List<TableId> optionalRoutedTable = getRoutedTables(tableId);
         if (!optionalRoutedTable.isEmpty()) {
-            optionalRoutedTable.forEach(evolvedTableId -> {
-                output.collect(
-                        new StreamRecord<>(
-                                normalizeSchemaChangeEvents(event, evolvedTableId, false)));
-            });
+            optionalRoutedTable.forEach(
+                    evolvedTableId -> {
+                        output.collect(
+                                new StreamRecord<>(
+                                        normalizeSchemaChangeEvents(event, evolvedTableId, false)));
+                    });
         } else if (Boolean.FALSE.equals(schemaDivergesMap.getIfPresent(tableId))) {
             output.collect(new StreamRecord<>(normalizeSchemaChangeEvents(event, true)));
         } else {

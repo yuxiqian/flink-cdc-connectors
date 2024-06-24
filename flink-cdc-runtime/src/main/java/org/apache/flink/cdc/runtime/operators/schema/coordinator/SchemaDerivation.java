@@ -91,7 +91,8 @@ public class SchemaDerivation {
                 events.add(derivedSchemaChangeEvent);
             } else {
                 // multiple source mapping (merging tables)
-                Schema derivedTableSchema = schemaManager.getLatestUpstreamSchema(derivedTable).get();
+                Schema derivedTableSchema =
+                        schemaManager.getLatestUpstreamSchema(derivedTable).get();
                 if (schemaChangeEvent instanceof CreateTableEvent) {
                     events.addAll(
                             handleCreateTableEvent(
