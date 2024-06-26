@@ -35,9 +35,10 @@ public class SchemaOperatorMetrics {
             new HashMap<SchemaChangeBehavior, Integer>() {
                 {
                     put(SchemaChangeBehavior.IGNORE, 0);
-                    put(SchemaChangeBehavior.TRY_EVOLVE, 1);
-                    put(SchemaChangeBehavior.EVOLVE, 2);
-                    put(SchemaChangeBehavior.EXCEPTION, 3);
+                    put(SchemaChangeBehavior.LENIENT, 1);
+                    put(SchemaChangeBehavior.TRY_EVOLVE, 2);
+                    put(SchemaChangeBehavior.EVOLVE, 3);
+                    put(SchemaChangeBehavior.EXCEPTION, 4);
                 }
             };
 

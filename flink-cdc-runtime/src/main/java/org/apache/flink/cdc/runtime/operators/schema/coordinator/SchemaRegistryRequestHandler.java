@@ -19,13 +19,20 @@ package org.apache.flink.cdc.runtime.operators.schema.coordinator;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.event.AddColumnEvent;
+import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
+import org.apache.flink.cdc.common.event.DropColumnEvent;
+import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
+import org.apache.flink.cdc.common.schema.Column;
+import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
+import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.runtime.operators.schema.event.RefreshPendingListsResponse;
 import org.apache.flink.cdc.runtime.operators.schema.event.ReleaseUpstreamRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.ReleaseUpstreamResponse;
@@ -41,14 +48,19 @@ import javax.annotation.concurrent.NotThreadSafe;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistryRequestHandler.RequestStatus.RECEIVED_RELEASE_REQUEST;
 import static org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils.wrap;
@@ -170,7 +182,7 @@ public class SchemaRegistryRequestHandler implements Closeable {
             }
             schemaManager.applyUpstreamSchemaChange(request.getSchemaChangeEvent());
             List<SchemaChangeEvent> derivedSchemaChangeEvents =
-                    schemaDerivation.applySchemaChange(request.getSchemaChangeEvent());
+                    calculateDerivedSchemaChangeEvents(request.getSchemaChangeEvent());
             CompletableFuture<CoordinationResponse> response =
                     CompletableFuture.completedFuture(
                             wrap(new SchemaChangeResponse(derivedSchemaChangeEvents)));
@@ -261,7 +273,7 @@ public class SchemaRegistryRequestHandler implements Closeable {
             } else {
                 schemaManager.applyUpstreamSchemaChange(request.getSchemaChangeEvent());
                 List<SchemaChangeEvent> derivedSchemaChangeEvents =
-                        schemaDerivation.applySchemaChange(request.getSchemaChangeEvent());
+                        calculateDerivedSchemaChangeEvents(request.getSchemaChangeEvent());
                 pendingSchemaChange
                         .getResponseFuture()
                         .complete(wrap(new SchemaChangeResponse(derivedSchemaChangeEvents)));
@@ -298,6 +310,114 @@ public class SchemaRegistryRequestHandler implements Closeable {
     public void close() throws IOException {
         if (schemaChangeThreadPool != null) {
             schemaChangeThreadPool.shutdown();
+        }
+    }
+
+    private List<SchemaChangeEvent> calculateDerivedSchemaChangeEvents(SchemaChangeEvent event) {
+        if (SchemaChangeBehavior.LENIENT.equals(schemaChangeBehavior)) {
+            return lenientizeSchemaChangeEvent(event).stream()
+                    .flatMap(evt -> schemaDerivation.applySchemaChange(evt).stream())
+                    .collect(Collectors.toList());
+        } else {
+            return schemaDerivation.applySchemaChange(event);
+        }
+    }
+
+    private List<SchemaChangeEvent> lenientizeSchemaChangeEvent(SchemaChangeEvent event) {
+        if (event instanceof CreateTableEvent) {
+            return Collections.singletonList(event);
+        }
+        TableId tableId = event.tableId();
+        Schema evolvedSchema =
+                schemaManager
+                        .getLatestEvolvedSchema(tableId)
+                        .orElseThrow(
+                                () ->
+                                        new IllegalStateException(
+                                                "Evolved schema does not exist, not ready for schema change event "
+                                                        + event));
+        switch (event.getType()) {
+            case ADD_COLUMN:
+                {
+                    AddColumnEvent addColumnEvent = (AddColumnEvent) event;
+                    return Collections.singletonList(
+                            new AddColumnEvent(
+                                    tableId,
+                                    addColumnEvent.getAddedColumns().stream()
+                                            .map(
+                                                    col ->
+                                                            new AddColumnEvent.ColumnWithPosition(
+                                                                    Column.physicalColumn(
+                                                                            col.getAddColumn()
+                                                                                    .getName(),
+                                                                            col.getAddColumn()
+                                                                                    .getType()
+                                                                                    .nullable(),
+                                                                            col.getAddColumn()
+                                                                                    .getComment())))
+                                            .collect(Collectors.toList())));
+                }
+            case DROP_COLUMN:
+                {
+                    DropColumnEvent dropColumnEvent = (DropColumnEvent) event;
+                    Map<String, DataType> convertNullableColumns =
+                            dropColumnEvent.getDroppedColumnNames().stream()
+                                    .map(evolvedSchema::getColumn)
+                                    .flatMap(e -> e.map(Stream::of).orElse(Stream.empty()))
+                                    .filter(col -> !col.getType().isNullable())
+                                    .collect(
+                                            Collectors.toMap(
+                                                    Column::getName,
+                                                    column -> column.getType().nullable()));
+
+                    if (convertNullableColumns.isEmpty()) {
+                        return Collections.emptyList();
+                    } else {
+                        return Collections.singletonList(
+                                new AlterColumnTypeEvent(tableId, convertNullableColumns));
+                    }
+                }
+            case RENAME_COLUMN:
+                {
+                    RenameColumnEvent renameColumnEvent = (RenameColumnEvent) event;
+                    List<AddColumnEvent.ColumnWithPosition> appendColumns = new ArrayList<>();
+                    Map<String, DataType> convertNullableColumns = new HashMap<>();
+                    renameColumnEvent
+                            .getNameMapping()
+                            .forEach(
+                                    (key, value) -> {
+                                        Column column =
+                                                evolvedSchema
+                                                        .getColumn(key)
+                                                        .orElseThrow(
+                                                                () ->
+                                                                        new IllegalArgumentException(
+                                                                                "Non-existed column "
+                                                                                        + key
+                                                                                        + " in evolved schema."));
+                                        if (!column.getType().isNullable()) {
+                                            // It's a not-nullable column, we need to cast it to
+                                            // nullable first
+                                            convertNullableColumns.put(
+                                                    key, column.getType().nullable());
+                                        }
+                                        appendColumns.add(
+                                                new AddColumnEvent.ColumnWithPosition(
+                                                        Column.physicalColumn(
+                                                                value,
+                                                                column.getType().nullable(),
+                                                                column.getComment())));
+                                    });
+
+                    List<SchemaChangeEvent> events = new ArrayList<>();
+                    events.add(new AddColumnEvent(tableId, appendColumns));
+                    if (!convertNullableColumns.isEmpty()) {
+                        events.add(new AlterColumnTypeEvent(tableId, convertNullableColumns));
+                    }
+                    return events;
+                }
+            default:
+                return Collections.singletonList(event);
         }
     }
 

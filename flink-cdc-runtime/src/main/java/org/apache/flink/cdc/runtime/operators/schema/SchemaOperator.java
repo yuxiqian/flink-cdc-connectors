@@ -338,8 +338,13 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                 RecordData.FieldGetter fieldGetter =
                         RecordData.createFieldGetter(
                                 originalSchema.getColumn(columnName).get().getType(), columnIndex);
-                // Check type compatibility
-                if (originalSchema.getColumn(columnName).get().getType().equals(column.getType())) {
+                // Check type compatibility, ignoring nullability
+                if (originalSchema
+                        .getColumn(columnName)
+                        .get()
+                        .getType()
+                        .nullable()
+                        .equals(column.getType().nullable())) {
                     fieldGetters.add(fieldGetter);
                 } else {
                     fieldGetters.add(
@@ -408,6 +413,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                                     schemaEvolveResponse.getPrintableFailedSchemaChangeEvents()));
                 }
             } else if (schemaChangeBehavior == SchemaChangeBehavior.TRY_EVOLVE
+                    || schemaChangeBehavior == SchemaChangeBehavior.LENIENT
                     || schemaChangeBehavior == SchemaChangeBehavior.IGNORE) {
                 if (schemaEvolveResponse.hasException()) {
                     schemaEvolveResponse
@@ -415,7 +421,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                             .forEach(
                                     e ->
                                             LOG.warn(
-                                                    "Failed to apply event {}, but keeps running in TRY_EVOLVE mode. Caused by: {}",
+                                                    "Failed to apply event {}, but keeps running in tolerant mode. Caused by: {}",
                                                     e.f0,
                                                     e.f1));
                 }

@@ -653,6 +653,82 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
                 jobManagerConsumer);
     }
 
+    @Test
+    public void testLenientSchemaEvolution() throws Exception {
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: %s\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.members\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: values\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  schema.change.behavior: lenient\n"
+                                + "  parallelism: 1",
+                        INTER_CONTAINER_MYSQL_ALIAS,
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        schemaEvolveDatabase.getDatabaseName());
+        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
+        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
+        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
+        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+        LOG.info("Pipeline job is running");
+        validateSnapshotData("members");
+
+        LOG.info("Starting schema evolution");
+        String mysqlJdbcUrl =
+                String.format(
+                        "jdbc:mysql://%s:%s/%s",
+                        MYSQL.getHost(),
+                        MYSQL.getDatabasePort(),
+                        schemaEvolveDatabase.getDatabaseName());
+
+        try (Connection conn =
+                        DriverManager.getConnection(
+                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+                Statement stmt = conn.createStatement()) {
+
+            waitForIncrementalStage("members", stmt);
+
+            // triggers AddColumnEvent
+            stmt.execute("ALTER TABLE members ADD COLUMN gender TINYINT AFTER age;");
+            stmt.execute("INSERT INTO members VALUES (1012, 'Eve', 17, 0);");
+
+            // triggers AlterColumnTypeEvent and RenameColumnEvent
+            stmt.execute("ALTER TABLE members CHANGE COLUMN age precise_age DOUBLE;");
+
+            // triggers RenameColumnEvent
+            stmt.execute("ALTER TABLE members RENAME COLUMN gender TO biological_sex;");
+
+            // triggers DropColumnEvent
+            stmt.execute("ALTER TABLE members DROP COLUMN biological_sex");
+            stmt.execute("INSERT INTO members VALUES (1013, 'Fiona', 16);");
+        }
+
+        List<String> expected =
+                Stream.of(
+                                "AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}",
+                                "DataChangeEvent{tableId=%s.members, before=[], after=[1012, Eve, 17, 0], op=INSERT, meta=()}",
+                                "AlterColumnTypeEvent{tableId=%s.members, nameMapping={age=DOUBLE}}",
+                                "AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`precise_age` DOUBLE, position=LAST, existedColumnName=null}]}",
+                                "AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`biological_sex` TINYINT, position=LAST, existedColumnName=null}]}",
+                                "DataChangeEvent{tableId=%s.members, before=[], after=[1013, Fiona, null, null, 16.0, null], op=INSERT, meta=()}")
+                        .map(s -> String.format(s, schemaEvolveDatabase.getDatabaseName()))
+                        .collect(Collectors.toList());
+
+        validateResult(expected, taskManagerConsumer);
+    }
+
     private void validateResult(List<String> expectedEvents, ToStringConsumer consumer)
             throws Exception {
         for (String event : expectedEvents) {

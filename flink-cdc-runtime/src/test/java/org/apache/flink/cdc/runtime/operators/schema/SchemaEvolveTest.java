@@ -1665,6 +1665,726 @@ public class SchemaEvolveTest {
         harness.close();
     }
 
+    /** Tests lenient schema change behavior. */
+    @Test
+    public void testLenientSchemaEvolves() throws Exception {
+        TableId tableId = CUSTOMERS_TABLE_ID;
+        Schema schemaV1 =
+                Schema.newBuilder()
+                        .physicalColumn("id", INT)
+                        .physicalColumn("name", STRING.notNull())
+                        .physicalColumn("age", SMALLINT)
+                        .primaryKey("id")
+                        .build();
+
+        SchemaChangeBehavior behavior = SchemaChangeBehavior.LENIENT;
+
+        SchemaOperator schemaOperator =
+                new SchemaOperator(new ArrayList<>(), Duration.ofSeconds(30), behavior);
+        EventOperatorTestHarness<SchemaOperator, Event> harness =
+                new EventOperatorTestHarness<>(schemaOperator, 17, Duration.ofSeconds(3), behavior);
+        harness.open();
+
+        // Test CreateTableEvent
+        {
+            List<Event> createAndInsertDataEvents =
+                    Arrays.asList(
+                            new CreateTableEvent(tableId, schemaV1),
+                            DataChangeEvent.insertEvent(
+                                    tableId,
+                                    buildRecord(INT, 1, STRING, "Alice", SMALLINT, (short) 17)),
+                            DataChangeEvent.insertEvent(
+                                    tableId,
+                                    buildRecord(INT, 2, STRING, "Bob", SMALLINT, (short) 18)),
+                            DataChangeEvent.insertEvent(
+                                    tableId,
+                                    buildRecord(INT, 3, STRING, "Carol", SMALLINT, (short) 19)));
+
+            processEvent(schemaOperator, createAndInsertDataEvents);
+
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(
+                            ListUtils.union(
+                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    createAndInsertDataEvents));
+
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV1);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV1);
+
+            harness.clearOutputRecords();
+        }
+
+        // Test AddColumnEvent
+        {
+            List<Event> addColumnEvents =
+                    Arrays.asList(
+                            new AddColumnEvent(
+                                    tableId,
+                                    Arrays.asList(
+                                            new AddColumnEvent.ColumnWithPosition(
+                                                    Column.physicalColumn(
+                                                            "score", INT, "Score data")),
+                                            new AddColumnEvent.ColumnWithPosition(
+                                                    Column.physicalColumn(
+                                                            "height", DOUBLE, "Height data")))),
+                            DataChangeEvent.insertEvent(
+                                    tableId,
+                                    buildRecord(
+                                            INT,
+                                            4,
+                                            STRING,
+                                            "Derrida",
+                                            SMALLINT,
+                                            (short) 20,
+                                            INT,
+                                            100,
+                                            DOUBLE,
+                                            173.25)),
+                            DataChangeEvent.insertEvent(
+                                    tableId,
+                                    buildRecord(
+                                            INT,
+                                            5,
+                                            STRING,
+                                            "Eve",
+                                            SMALLINT,
+                                            (short) 21,
+                                            INT,
+                                            97,
+                                            DOUBLE,
+                                            160.)));
+            processEvent(schemaOperator, addColumnEvents);
+
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(
+                            ListUtils.union(
+                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    addColumnEvents));
+
+            Schema schemaV2 =
+                    Schema.newBuilder()
+                            .physicalColumn("id", INT)
+                            .physicalColumn("name", STRING.notNull())
+                            .physicalColumn("age", SMALLINT)
+                            .physicalColumn("score", INT, "Score data")
+                            .physicalColumn("height", DOUBLE, "Height data")
+                            .primaryKey("id")
+                            .build();
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV2);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV2);
+
+            harness.clearOutputRecords();
+        }
+
+        // Test RenameColumnEvent
+        {
+            List<Event> renameColumnEvents =
+                    Arrays.asList(
+                            new RenameColumnEvent(
+                                    tableId, ImmutableMap.of("name", "namae", "age", "toshi")),
+                            DataChangeEvent.insertEvent(
+                                    tableId,
+                                    buildRecord(
+                                            INT,
+                                            6,
+                                            STRING,
+                                            "Fiona",
+                                            SMALLINT,
+                                            (short) 22,
+                                            INT,
+                                            100,
+                                            DOUBLE,
+                                            173.25)),
+                            DataChangeEvent.insertEvent(
+                                    tableId,
+                                    buildRecord(
+                                            INT,
+                                            7,
+                                            STRING,
+                                            "Gloria",
+                                            SMALLINT,
+                                            (short) 23,
+                                            INT,
+                                            97,
+                                            DOUBLE,
+                                            160.)));
+
+            processEvent(schemaOperator, renameColumnEvents);
+
+            List<Event> lenientRenameColumnEvents =
+                    Arrays.asList(
+                            new AddColumnEvent(
+                                    tableId,
+                                    Arrays.asList(
+                                            new AddColumnEvent.ColumnWithPosition(
+                                                    Column.physicalColumn("namae", STRING, null)),
+                                            new AddColumnEvent.ColumnWithPosition(
+                                                    Column.physicalColumn(
+                                                            "toshi", SMALLINT, null)))),
+                            new AlterColumnTypeEvent(
+                                    tableId, Collections.singletonMap("name", STRING)),
+                            DataChangeEvent.insertEvent(
+                                    tableId,
+                                    buildRecord(
+                                            INT,
+                                            6,
+                                            STRING,
+                                            null,
+                                            SMALLINT,
+                                            null,
+                                            INT,
+                                            100,
+                                            DOUBLE,
+                                            173.25,
+                                            STRING,
+                                            "Fiona",
+                                            SMALLINT,
+                                            (short) 22)),
+                            DataChangeEvent.insertEvent(
+                                    tableId,
+                                    buildRecord(
+                                            INT,
+                                            7,
+                                            STRING,
+                                            null,
+                                            SMALLINT,
+                                            null,
+                                            INT,
+                                            97,
+                                            DOUBLE,
+                                            160.,
+                                            STRING,
+                                            "Gloria",
+                                            SMALLINT,
+                                            (short) 23)));
+
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(
+                            ListUtils.union(
+                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    lenientRenameColumnEvents));
+
+            Schema schemaV3 =
+                    Schema.newBuilder()
+                            .physicalColumn("id", INT)
+                            .physicalColumn("namae", STRING.notNull())
+                            .physicalColumn("toshi", SMALLINT)
+                            .physicalColumn("score", INT, "Score data")
+                            .physicalColumn("height", DOUBLE, "Height data")
+                            .primaryKey("id")
+                            .build();
+
+            Schema schemaV3E =
+                    Schema.newBuilder()
+                            .physicalColumn("id", INT)
+                            .physicalColumn("name", STRING)
+                            .physicalColumn("age", SMALLINT)
+                            .physicalColumn("score", INT, "Score data")
+                            .physicalColumn("height", DOUBLE, "Height data")
+                            .physicalColumn("namae", STRING)
+                            .physicalColumn("toshi", SMALLINT)
+                            .primaryKey("id")
+                            .build();
+
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV3);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV3E);
+
+            harness.clearOutputRecords();
+        }
+
+        // Test AlterColumnTypeEvent
+        {
+            List<Event> alterColumnTypeEvents =
+                    Arrays.asList(
+                            new AlterColumnTypeEvent(
+                                    tableId, ImmutableMap.of("score", BIGINT, "toshi", FLOAT)),
+                            DataChangeEvent.insertEvent(
+                                    tableId,
+                                    buildRecord(
+                                            INT, 8, STRING, "Helen", FLOAT, 22f, BIGINT, 100L,
+                                            DOUBLE, 173.25)),
+                            DataChangeEvent.insertEvent(
+                                    tableId,
+                                    buildRecord(
+                                            INT, 9, STRING, "Iva", FLOAT, 23f, BIGINT, 97L, DOUBLE,
+                                            160.)));
+
+            processEvent(schemaOperator, alterColumnTypeEvents);
+
+            List<Event> lenientAlterColumnTypeEvents =
+                    Arrays.asList(
+                            new AlterColumnTypeEvent(
+                                    tableId, ImmutableMap.of("score", BIGINT, "toshi", FLOAT)),
+                            DataChangeEvent.insertEvent(
+                                    tableId,
+                                    buildRecord(
+                                            INT, 8, STRING, null, SMALLINT, null, BIGINT, 100L,
+                                            DOUBLE, 173.25, STRING, "Helen", FLOAT, 22f)),
+                            DataChangeEvent.insertEvent(
+                                    tableId,
+                                    buildRecord(
+                                            INT, 9, STRING, null, SMALLINT, null, BIGINT, 97L,
+                                            DOUBLE, 160., STRING, "Iva", FLOAT, 23f)));
+
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(
+                            ListUtils.union(
+                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    lenientAlterColumnTypeEvents));
+
+            Schema schemaV4 =
+                    Schema.newBuilder()
+                            .physicalColumn("id", INT)
+                            .physicalColumn("namae", STRING.notNull())
+                            .physicalColumn("toshi", FLOAT)
+                            .physicalColumn("score", BIGINT, "Score data")
+                            .physicalColumn("height", DOUBLE, "Height data")
+                            .primaryKey("id")
+                            .build();
+
+            Schema schemaV4E =
+                    Schema.newBuilder()
+                            .physicalColumn("id", INT)
+                            .physicalColumn("name", STRING)
+                            .physicalColumn("age", SMALLINT)
+                            .physicalColumn("score", BIGINT, "Score data")
+                            .physicalColumn("height", DOUBLE, "Height data")
+                            .physicalColumn("namae", STRING)
+                            .physicalColumn("toshi", FLOAT)
+                            .primaryKey("id")
+                            .build();
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV4);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV4E);
+
+            harness.clearOutputRecords();
+        }
+
+        // Test DropColumnEvent
+        {
+            List<Event> dropColumnEvents =
+                    Arrays.asList(
+                            new DropColumnEvent(tableId, Arrays.asList("score", "height")),
+                            DataChangeEvent.insertEvent(
+                                    tableId, buildRecord(INT, 12, STRING, "Jane", FLOAT, 11f)),
+                            DataChangeEvent.insertEvent(
+                                    tableId, buildRecord(INT, 13, STRING, "Kryo", FLOAT, 23f)));
+
+            processEvent(schemaOperator, dropColumnEvents);
+
+            List<Event> lenientDropColumnEvents =
+                    Arrays.asList(
+                            DataChangeEvent.insertEvent(
+                                    tableId,
+                                    buildRecord(
+                                            INT, 12, STRING, null, SMALLINT, null, BIGINT, null,
+                                            DOUBLE, null, STRING, "Jane", FLOAT, 11f)),
+                            DataChangeEvent.insertEvent(
+                                    tableId,
+                                    buildRecord(
+                                            INT, 13, STRING, null, SMALLINT, null, BIGINT, null,
+                                            DOUBLE, null, STRING, "Kryo", FLOAT, 23f)));
+
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(lenientDropColumnEvents);
+
+            Schema schemaV5 =
+                    Schema.newBuilder()
+                            .physicalColumn("id", INT)
+                            .physicalColumn("namae", STRING.notNull())
+                            .physicalColumn("toshi", FLOAT)
+                            .primaryKey("id")
+                            .build();
+
+            Schema schemaV5E =
+                    Schema.newBuilder()
+                            .physicalColumn("id", INT)
+                            .physicalColumn("name", STRING)
+                            .physicalColumn("age", SMALLINT)
+                            .physicalColumn("score", BIGINT, "Score data")
+                            .physicalColumn("height", DOUBLE, "Height data")
+                            .physicalColumn("namae", STRING)
+                            .physicalColumn("toshi", FLOAT)
+                            .primaryKey("id")
+                            .build();
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV5);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV5E);
+
+            harness.clearOutputRecords();
+        }
+        harness.close();
+    }
+
+    @Test
+    public void testLenientEvolveTweaks() throws Exception {
+        TableId tableId = CUSTOMERS_TABLE_ID;
+        Schema schemaV1 =
+                Schema.newBuilder()
+                        .physicalColumn("id", INT)
+                        .physicalColumn("iina", INT.notNull())
+                        .physicalColumn("name", STRING.notNull())
+                        .physicalColumn("age", SMALLINT)
+                        .primaryKey("id")
+                        .build();
+
+        SchemaChangeBehavior behavior = SchemaChangeBehavior.LENIENT;
+
+        SchemaOperator schemaOperator =
+                new SchemaOperator(new ArrayList<>(), Duration.ofSeconds(30), behavior);
+        EventOperatorTestHarness<SchemaOperator, Event> harness =
+                new EventOperatorTestHarness<>(schemaOperator, 17, Duration.ofSeconds(3), behavior);
+        harness.open();
+
+        // Test CreateTableEvent
+        {
+            List<Event> createAndInsertDataEvents =
+                    Arrays.asList(
+                            new CreateTableEvent(tableId, schemaV1),
+                            DataChangeEvent.insertEvent(
+                                    tableId,
+                                    buildRecord(
+                                            INT, 1, INT, 0, STRING, "Alice", SMALLINT, (short) 17)),
+                            DataChangeEvent.insertEvent(
+                                    tableId,
+                                    buildRecord(
+                                            INT, 2, INT, 0, STRING, "Bob", SMALLINT, (short) 18)),
+                            DataChangeEvent.insertEvent(
+                                    tableId,
+                                    buildRecord(
+                                            INT,
+                                            3,
+                                            INT,
+                                            0,
+                                            STRING,
+                                            "Carol",
+                                            SMALLINT,
+                                            (short) 19)));
+
+            processEvent(schemaOperator, createAndInsertDataEvents);
+
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(
+                            ListUtils.union(
+                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    createAndInsertDataEvents));
+
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV1);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV1);
+
+            harness.clearOutputRecords();
+        }
+
+        // Test drop a non-null column
+        {
+            List<Event> dropColumnEvents =
+                    Arrays.asList(
+                            new DropColumnEvent(tableId, Collections.singletonList("name")),
+                            DataChangeEvent.insertEvent(
+                                    tableId, buildRecord(INT, 12, INT, 0, SMALLINT, (short) 11)),
+                            DataChangeEvent.insertEvent(
+                                    tableId, buildRecord(INT, 13, INT, 0, SMALLINT, (short) 23)));
+
+            processEvent(schemaOperator, dropColumnEvents);
+
+            List<Event> lenientDropColumnEvents =
+                    Arrays.asList(
+                            new AlterColumnTypeEvent(
+                                    tableId, Collections.singletonMap("name", STRING)),
+                            DataChangeEvent.insertEvent(
+                                    tableId,
+                                    buildRecord(
+                                            INT, 12, INT, 0, STRING, null, SMALLINT, (short) 11)),
+                            DataChangeEvent.insertEvent(
+                                    tableId,
+                                    buildRecord(
+                                            INT, 13, INT, 0, STRING, null, SMALLINT, (short) 23)));
+
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(
+                            ListUtils.union(
+                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    lenientDropColumnEvents));
+
+            Schema schemaV2 =
+                    Schema.newBuilder()
+                            .physicalColumn("id", INT)
+                            .physicalColumn("iina", INT.notNull())
+                            .physicalColumn("age", SMALLINT)
+                            .primaryKey("id")
+                            .build();
+
+            Schema schemaV2E =
+                    Schema.newBuilder()
+                            .physicalColumn("id", INT)
+                            .physicalColumn("iina", INT.notNull())
+                            .physicalColumn("name", STRING)
+                            .physicalColumn("age", SMALLINT)
+                            .primaryKey("id")
+                            .build();
+
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV2);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV2E);
+
+            harness.clearOutputRecords();
+        }
+
+        // Test inserting non-null column and somewhere in the middle
+        {
+            List<Event> addColumnEvents =
+                    Arrays.asList(
+                            new AddColumnEvent(
+                                    tableId,
+                                    Arrays.asList(
+                                            new AddColumnEvent.ColumnWithPosition(
+                                                    Column.physicalColumn("nickname", STRING),
+                                                    AddColumnEvent.ColumnPosition.AFTER,
+                                                    "id"),
+                                            new AddColumnEvent.ColumnWithPosition(
+                                                    Column.physicalColumn(
+                                                            "extra", STRING.notNull())))),
+                            DataChangeEvent.insertEvent(
+                                    tableId,
+                                    buildRecord(
+                                            INT,
+                                            12,
+                                            STRING,
+                                            "Alice",
+                                            INT,
+                                            0,
+                                            SMALLINT,
+                                            (short) 11,
+                                            STRING,
+                                            "ailisi")),
+                            DataChangeEvent.insertEvent(
+                                    tableId,
+                                    buildRecord(
+                                            INT,
+                                            13,
+                                            STRING,
+                                            "Bob",
+                                            INT,
+                                            0,
+                                            SMALLINT,
+                                            (short) 23,
+                                            STRING,
+                                            "baobo")));
+
+            processEvent(schemaOperator, addColumnEvents);
+
+            List<Event> lenientAddColumnEvents =
+                    Arrays.asList(
+                            new AddColumnEvent(
+                                    tableId,
+                                    Arrays.asList(
+                                            new AddColumnEvent.ColumnWithPosition(
+                                                    Column.physicalColumn("nickname", STRING)),
+                                            new AddColumnEvent.ColumnWithPosition(
+                                                    Column.physicalColumn("extra", STRING)))),
+                            DataChangeEvent.insertEvent(
+                                    tableId,
+                                    buildRecord(
+                                            INT,
+                                            12,
+                                            INT,
+                                            0,
+                                            STRING,
+                                            null,
+                                            SMALLINT,
+                                            (short) 11,
+                                            STRING,
+                                            "Alice",
+                                            STRING,
+                                            "ailisi")),
+                            DataChangeEvent.insertEvent(
+                                    tableId,
+                                    buildRecord(
+                                            INT,
+                                            13,
+                                            INT,
+                                            0,
+                                            STRING,
+                                            null,
+                                            SMALLINT,
+                                            (short) 23,
+                                            STRING,
+                                            "Bob",
+                                            STRING,
+                                            "baobo")));
+
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(
+                            ListUtils.union(
+                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    lenientAddColumnEvents));
+
+            Schema schemaV3 =
+                    Schema.newBuilder()
+                            .physicalColumn("id", INT)
+                            .physicalColumn("nickname", STRING)
+                            .physicalColumn("iina", INT.notNull())
+                            .physicalColumn("age", SMALLINT)
+                            .physicalColumn("extra", STRING.notNull())
+                            .primaryKey("id")
+                            .build();
+
+            Schema schemaV3E =
+                    Schema.newBuilder()
+                            .physicalColumn("id", INT)
+                            .physicalColumn("iina", INT.notNull())
+                            .physicalColumn("name", STRING)
+                            .physicalColumn("age", SMALLINT)
+                            .physicalColumn("nickname", STRING)
+                            .physicalColumn("extra", STRING)
+                            .primaryKey("id")
+                            .build();
+
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV3);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV3E);
+
+            harness.clearOutputRecords();
+        }
+
+        // Test renaming a non-null column
+        {
+            List<Event> renameColumnEvents =
+                    Arrays.asList(
+                            new RenameColumnEvent(
+                                    tableId, Collections.singletonMap("iina", "yina")),
+                            DataChangeEvent.insertEvent(
+                                    tableId,
+                                    buildRecord(
+                                            INT,
+                                            41,
+                                            STRING,
+                                            "Carol",
+                                            INT,
+                                            0,
+                                            SMALLINT,
+                                            (short) 11,
+                                            STRING,
+                                            "kaluo")),
+                            DataChangeEvent.insertEvent(
+                                    tableId,
+                                    buildRecord(
+                                            INT,
+                                            42,
+                                            STRING,
+                                            "Dorothy",
+                                            INT,
+                                            0,
+                                            SMALLINT,
+                                            (short) 11,
+                                            STRING,
+                                            "duoluoxi")));
+
+            processEvent(schemaOperator, renameColumnEvents);
+
+            harness.getLatestEvolvedSchema(tableId);
+            List<Event> lenientRenameColumnEvents =
+                    Arrays.asList(
+                            new AddColumnEvent(
+                                    tableId,
+                                    Collections.singletonList(
+                                            new AddColumnEvent.ColumnWithPosition(
+                                                    Column.physicalColumn("yina", INT)))),
+                            new AlterColumnTypeEvent(
+                                    tableId, Collections.singletonMap("iina", INT)),
+                            DataChangeEvent.insertEvent(
+                                    tableId,
+                                    buildRecord(
+                                            INT,
+                                            41,
+                                            INT,
+                                            null,
+                                            STRING,
+                                            null,
+                                            SMALLINT,
+                                            (short) 11,
+                                            STRING,
+                                            "Carol",
+                                            STRING,
+                                            "kaluo",
+                                            INT,
+                                            0)),
+                            DataChangeEvent.insertEvent(
+                                    tableId,
+                                    buildRecord(
+                                            INT,
+                                            42,
+                                            INT,
+                                            null,
+                                            STRING,
+                                            null,
+                                            SMALLINT,
+                                            (short) 11,
+                                            STRING,
+                                            "Dorothy",
+                                            STRING,
+                                            "duoluoxi",
+                                            INT,
+                                            0)));
+
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(
+                            ListUtils.union(
+                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    lenientRenameColumnEvents));
+
+            Schema schemaV4 =
+                    Schema.newBuilder()
+                            .physicalColumn("id", INT)
+                            .physicalColumn("nickname", STRING)
+                            .physicalColumn("yina", INT.notNull())
+                            .physicalColumn("age", SMALLINT)
+                            .physicalColumn("extra", STRING.notNull())
+                            .primaryKey("id")
+                            .build();
+
+            Schema schemaV4E =
+                    Schema.newBuilder()
+                            .physicalColumn("id", INT)
+                            .physicalColumn("iina", INT)
+                            .physicalColumn("name", STRING)
+                            .physicalColumn("age", SMALLINT)
+                            .physicalColumn("nickname", STRING)
+                            .physicalColumn("extra", STRING)
+                            .physicalColumn("yina", INT)
+                            .primaryKey("id")
+                            .build();
+
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV4);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV4E);
+
+            harness.clearOutputRecords();
+        }
+    }
+
     private RecordData buildRecord(final Object... args) {
         List<DataType> dataTypes = new ArrayList<>();
         List<Object> objects = new ArrayList<>();
