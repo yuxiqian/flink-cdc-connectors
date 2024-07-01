@@ -39,8 +39,7 @@ public class SchemaSerializer extends TypeSerializerSingleton<Schema> {
     /** Sharable instance of the TableIdSerializer. */
     public static final SchemaSerializer INSTANCE = new SchemaSerializer();
 
-    private final ListSerializer<Column> columnsSerializer =
-            new ListSerializer<>(ColumnSerializer.INSTANCE);
+    private ListSerializer<Column> columnsSerializer;
     private final ListSerializer<String> primaryKeysSerializer =
             new ListSerializer<>(StringSerializer.INSTANCE);
     private final ListSerializer<String> partitionKeysSerializer =
@@ -82,6 +81,10 @@ public class SchemaSerializer extends TypeSerializerSingleton<Schema> {
 
     @Override
     public void serialize(Schema record, DataOutputView target) throws IOException {
+        if (columnsSerializer == null) {
+            columnsSerializer =
+                    new ListSerializer<>(ColumnSerializer.INSTANCE);
+        }
         columnsSerializer.serialize(record.getColumns(), target);
         primaryKeysSerializer.serialize(record.primaryKeys(), target);
         partitionKeysSerializer.serialize(record.partitionKeys(), target);
@@ -97,6 +100,11 @@ public class SchemaSerializer extends TypeSerializerSingleton<Schema> {
     }
 
     public Schema deserialize(int version, DataInputView source) throws IOException {
+        if (columnsSerializer == null) {
+            ColumnSerializer.updateVersion(version);
+            columnsSerializer =
+                    new ListSerializer<>(ColumnSerializer.INSTANCE);
+        }
         switch (version) {
             case 0:
                 return Schema.newBuilder()

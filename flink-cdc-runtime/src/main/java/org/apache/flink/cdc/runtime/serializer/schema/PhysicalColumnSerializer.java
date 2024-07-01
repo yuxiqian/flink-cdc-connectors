@@ -42,6 +42,13 @@ public class PhysicalColumnSerializer extends TypeSerializerSingleton<PhysicalCo
     private final DataTypeSerializer dataTypeSerializer = new DataTypeSerializer();
     private final StringSerializer stringSerializer = StringSerializer.INSTANCE;
 
+    /**
+     * Identify for different major version:
+     * for Version 3.0/3.1 is 0,
+     * for version 3.2 is 1
+     */
+    private static final int CURRENT_VERSION = 1;
+
     @Override
     public boolean isImmutableType() {
         return false;
@@ -81,11 +88,28 @@ public class PhysicalColumnSerializer extends TypeSerializerSingleton<PhysicalCo
 
     @Override
     public PhysicalColumn deserialize(DataInputView source) throws IOException {
-        String name = stringSerializer.deserialize(source);
-        DataType dataType = dataTypeSerializer.deserialize(source);
-        String comment = stringSerializer.deserialize(source);
-        String defaultValue = stringSerializer.deserialize(source);
-        return Column.physicalColumn(name, dataType, comment, defaultValue);
+        return deserialize(CURRENT_VERSION, source);
+    }
+
+    public PhysicalColumn deserialize(int version, DataInputView source) throws IOException {
+        switch (version) {
+            case 0: {
+                String name = stringSerializer.deserialize(source);
+                DataType dataType = dataTypeSerializer.deserialize(source);
+                String comment = stringSerializer.deserialize(source);
+                return Column.physicalColumn(name, dataType, comment);
+            }
+            case 1: {
+                String name = stringSerializer.deserialize(source);
+                DataType dataType = dataTypeSerializer.deserialize(source);
+                String comment = stringSerializer.deserialize(source);
+                String defaultValue = stringSerializer.deserialize(source);
+                return Column.physicalColumn(name, dataType, comment, defaultValue);
+            }
+            default: {
+                throw new IOException("Unrecognized serialization version " + version);
+            }
+        }
     }
 
     @Override
