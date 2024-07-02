@@ -55,7 +55,8 @@ public class JaninoCompiler {
                     "LOCALTIMESTAMP",
                     "CURRENT_TIME",
                     "CURRENT_DATE",
-                    "CURRENT_TIMESTAMP");
+                    "CURRENT_TIMESTAMP",
+                    "NOW");
     public static final String DEFAULT_EPOCH_TIME = "__epoch_time__";
     public static final String DEFAULT_TIME_ZONE = "__time_zone__";
 
@@ -289,8 +290,6 @@ public class JaninoCompiler {
             } else {
                 throw new ParseException("Unrecognized expression: " + sqlBasicCall.toString());
             }
-        } else if (operationName.equals("NOW")) {
-            return generateNoOperandTimestampFunctionOperation(operationName);
         } else {
             return new Java.MethodInvocation(
                     Location.NOWHERE,

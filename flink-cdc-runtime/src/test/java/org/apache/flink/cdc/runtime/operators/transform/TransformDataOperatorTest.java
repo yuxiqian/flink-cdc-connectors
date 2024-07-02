@@ -502,7 +502,7 @@ public class TransformDataOperatorTest {
                         .addTransform(
                                 TIMESTAMP_TABLEID.identifier(),
                                 "col1, IF(LOCALTIME = CURRENT_TIME, 1, 0) as time_equal,"
-                                        + " IF(LOCALTIMESTAMP = CURRENT_TIMESTAMP, 1, 0) as timestamp_equal,"
+                                        + " IF(DATE_FORMAT(CURRENT_TIMESTAMP, 'yyyy-MM-dd HH:mm:ss') = DATE_FORMAT(NOW(), 'yyyy-MM-dd HH:mm:ss'), 1, 0) as timestamp_equal,"
                                         + " IF(TO_DATE(DATE_FORMAT(LOCALTIMESTAMP, 'yyyy-MM-dd')) = CURRENT_DATE, 1, 0) as date_equal",
                                 "LOCALTIMESTAMP = CURRENT_TIMESTAMP")
                         .addTimezone("GMT")
@@ -538,6 +538,26 @@ public class TransformDataOperatorTest {
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(insertEventExpect));
+
+        DataChangeEvent insertEvent2 =
+                DataChangeEvent.insertEvent(
+                        TIMESTAMPDIFF_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("2"), null, null, null, null, null, null
+                                }));
+        DataChangeEvent insertEventExpect2 =
+                DataChangeEvent.insertEvent(
+                        TIMESTAMPDIFF_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("2"), -28800, -480, -8, 0, 0, 0
+                                }));
+
+        transform.processElement(new StreamRecord<>(insertEvent2));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(insertEventExpect2));
     }
 
     @Test
@@ -552,7 +572,16 @@ public class TransformDataOperatorTest {
                                         + " TIMESTAMP_DIFF('DAY', LOCALTIMESTAMP, CURRENT_TIMESTAMP) as day_diff,"
                                         + " TIMESTAMP_DIFF('MONTH', LOCALTIMESTAMP, CURRENT_TIMESTAMP) as month_diff,"
                                         + " TIMESTAMP_DIFF('YEAR', LOCALTIMESTAMP, CURRENT_TIMESTAMP) as year_diff",
-                                null)
+                                "col1='1'")
+                        .addTransform(
+                                TIMESTAMPDIFF_TABLEID.identifier(),
+                                "col1, TIMESTAMP_DIFF('SECOND', LOCALTIMESTAMP, NOW()) as second_diff,"
+                                        + " TIMESTAMP_DIFF('MINUTE', LOCALTIMESTAMP, NOW()) as minute_diff,"
+                                        + " TIMESTAMP_DIFF('HOUR', LOCALTIMESTAMP, NOW()) as hour_diff,"
+                                        + " TIMESTAMP_DIFF('DAY', LOCALTIMESTAMP, NOW()) as day_diff,"
+                                        + " TIMESTAMP_DIFF('MONTH', LOCALTIMESTAMP, NOW()) as month_diff,"
+                                        + " TIMESTAMP_DIFF('YEAR', LOCALTIMESTAMP, NOW()) as year_diff",
+                                "col1='2'")
                         .addTimezone("GMT-8:00")
                         .build();
         EventOperatorTestHarness<TransformDataOperator, Event>

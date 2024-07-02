@@ -65,22 +65,23 @@ public class SystemFunctionUtils {
     }
 
     public static LocalZonedTimestampData now(long epochTime, String timezone) {
-        return LocalZonedTimestampData.fromEpochMillis(epochTime);
+        return LocalZonedTimestampData.fromEpochMillis(
+                epochTime + TimeZone.getTimeZone(timezone).getOffset(epochTime));
     }
 
     public static String dateFormat(LocalZonedTimestampData timestamp, String format) {
-        SimpleDateFormat dateFormat = new SimpleDateFormat(format);
-        return dateFormat.format(new Date(timestamp.getEpochMillisecond()));
+        return DateTimeUtils.formatTimestampMillis(
+                timestamp.getEpochMillisecond(), format, TimeZone.getTimeZone("GMT"));
     }
 
     public static String dateFormat(TimestampData timestamp, String format) {
-        SimpleDateFormat dateFormat = new SimpleDateFormat(format);
-        return dateFormat.format(new Date(timestamp.getMillisecond()));
+        return DateTimeUtils.formatTimestampMillis(
+                timestamp.getMillisecond(), format, TimeZone.getTimeZone("GMT"));
     }
 
     public static String dateFormat(ZonedTimestampData timestamp, String format) {
-        SimpleDateFormat dateFormat = new SimpleDateFormat(format);
-        return dateFormat.format(new Date(timestamp.getMillisecond()));
+        return DateTimeUtils.formatTimestampMillis(
+                timestamp.getMillisecond(), format, TimeZone.getTimeZone("GMT"));
     }
 
     public static int toDate(String str) {
@@ -116,6 +117,18 @@ public class SystemFunctionUtils {
     public static int timestampDiff(
             String symbol, TimestampData fromTimestamp, TimestampData toTimestamp) {
         return timestampDiff(symbol, fromTimestamp.getMillisecond(), toTimestamp.getMillisecond());
+    }
+
+    public static int timestampDiff(
+            String symbol, TimestampData fromTimestamp, LocalZonedTimestampData toTimestamp) {
+        return timestampDiff(
+                symbol, fromTimestamp.getMillisecond(), toTimestamp.getEpochMillisecond());
+    }
+
+    public static int timestampDiff(
+            String symbol, LocalZonedTimestampData fromTimestamp, TimestampData toTimestamp) {
+        return timestampDiff(
+                symbol, fromTimestamp.getEpochMillisecond(), toTimestamp.getMillisecond());
     }
 
     public static int timestampDiff(

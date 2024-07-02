@@ -119,4 +119,15 @@ public class DateTimeUtils {
         int m = month + 12 * a - 3;
         return day + (153 * m + 2) / 5 + 365 * y + y / 4 - y / 100 + y / 400 - 32045;
     }
+
+    // --------------------------------------------------------------------------------------------
+    // Format
+    // --------------------------------------------------------------------------------------------
+
+    public static String formatTimestampMillis(long ts, String format, TimeZone timeZone) {
+        SimpleDateFormat formatter = FORMATTER_CACHE.get(format);
+        formatter.setTimeZone(timeZone);
+        Date dateTime = new Date(ts);
+        return formatter.format(dateTime);
+    }
 }
