@@ -46,11 +46,11 @@ public class ColumnSerializer extends TypeSerializerSingleton<Column> {
     private final MetadataColumnSerializer metadataColumnSerializer =
             MetadataColumnSerializer.INSTANCE;
 
-    private static int CURRENT_VERSION = 2;
+    private static int currentVersion = 2;
 
-    /** Update {@link #CURRENT_VERSION} as We did not directly include this version in the file. */
+    /** Update {@link #currentVersion} as We did not directly include this version in the file. */
     public static void updateVersion(int version) {
-        CURRENT_VERSION = version;
+        currentVersion = version;
     }
 
     @Override
@@ -99,7 +99,7 @@ public class ColumnSerializer extends TypeSerializerSingleton<Column> {
 
     @Override
     public Column deserialize(DataInputView source) throws IOException {
-        return deserialize(CURRENT_VERSION, source);
+        return deserialize(currentVersion, source);
     }
 
     public Column deserialize(int version, DataInputView source) throws IOException {
