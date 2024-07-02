@@ -43,9 +43,9 @@ public class PhysicalColumnSerializer extends TypeSerializerSingleton<PhysicalCo
     private final StringSerializer stringSerializer = StringSerializer.INSTANCE;
 
     /**
-     * Identify for different major version:
-     * for Version 3.0/3.1 is 0,
-     * for version 3.2 is 1
+     * Identify for different release version:
+     * for Version 3.0.0~3.1.1 is 0,
+     * for version 3.2.0 is 1.
      */
     private static final int CURRENT_VERSION = 1;
 
