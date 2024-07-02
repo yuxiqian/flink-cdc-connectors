@@ -82,8 +82,7 @@ public class SchemaSerializer extends TypeSerializerSingleton<Schema> {
     @Override
     public void serialize(Schema record, DataOutputView target) throws IOException {
         if (columnsSerializer == null) {
-            columnsSerializer =
-                    new ListSerializer<>(ColumnSerializer.INSTANCE);
+            columnsSerializer = new ListSerializer<>(ColumnSerializer.INSTANCE);
         }
         columnsSerializer.serialize(record.getColumns(), target);
         primaryKeysSerializer.serialize(record.primaryKeys(), target);
@@ -101,10 +100,10 @@ public class SchemaSerializer extends TypeSerializerSingleton<Schema> {
 
     public Schema deserialize(int version, DataInputView source) throws IOException {
         if (columnsSerializer == null) {
-            // Manually updating versions because column deserialization is wrapped by ListSerializer.
+            // Manually updating versions because column deserialization is wrapped by
+            // ListSerializer.
             ColumnSerializer.updateVersion(version);
-            columnsSerializer =
-                    new ListSerializer<>(ColumnSerializer.INSTANCE);
+            columnsSerializer = new ListSerializer<>(ColumnSerializer.INSTANCE);
         }
         switch (version) {
             case 0:

@@ -173,10 +173,8 @@ public class SchemaManager {
     public static class Serializer implements SimpleVersionedSerializer<SchemaManager> {
 
         /**
-         * Update history:
-         * from Version 3.0.0, set to 0,
-         * from version 3.1.1, updated to 1,
-         * from version 3.2.0, updated to 2.
+         * Update history: from Version 3.0.0, set to 0, from version 3.1.1, updated to 1, from
+         * version 3.2.0, updated to 2.
          */
         public static final int CURRENT_VERSION = 2;
 

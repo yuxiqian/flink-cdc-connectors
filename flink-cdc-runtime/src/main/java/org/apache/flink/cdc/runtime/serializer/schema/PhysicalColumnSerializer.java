@@ -89,22 +89,25 @@ public class PhysicalColumnSerializer extends TypeSerializerSingleton<PhysicalCo
     public PhysicalColumn deserialize(int version, DataInputView source) throws IOException {
         switch (version) {
             case 0:
-            case 1:{
-                String name = stringSerializer.deserialize(source);
-                DataType dataType = dataTypeSerializer.deserialize(source);
-                String comment = stringSerializer.deserialize(source);
-                return Column.physicalColumn(name, dataType, comment);
-            }
-            case 2: {
-                String name = stringSerializer.deserialize(source);
-                DataType dataType = dataTypeSerializer.deserialize(source);
-                String comment = stringSerializer.deserialize(source);
-                String defaultValue = stringSerializer.deserialize(source);
-                return Column.physicalColumn(name, dataType, comment, defaultValue);
-            }
-            default: {
-                throw new IOException("Unrecognized serialization version " + version);
-            }
+            case 1:
+                {
+                    String name = stringSerializer.deserialize(source);
+                    DataType dataType = dataTypeSerializer.deserialize(source);
+                    String comment = stringSerializer.deserialize(source);
+                    return Column.physicalColumn(name, dataType, comment);
+                }
+            case 2:
+                {
+                    String name = stringSerializer.deserialize(source);
+                    DataType dataType = dataTypeSerializer.deserialize(source);
+                    String comment = stringSerializer.deserialize(source);
+                    String defaultValue = stringSerializer.deserialize(source);
+                    return Column.physicalColumn(name, dataType, comment, defaultValue);
+                }
+            default:
+                {
+                    throw new IOException("Unrecognized serialization version " + version);
+                }
         }
     }
 

@@ -48,12 +48,11 @@ public class ColumnSerializer extends TypeSerializerSingleton<Column> {
 
     private static int CURRENT_VERSION = 2;
 
-    /**
-     * Update {@link #CURRENT_VERSION} as We did not directly include this version in the file.
-     */
+    /** Update {@link #CURRENT_VERSION} as We did not directly include this version in the file. */
     public static void updateVersion(int version) {
         CURRENT_VERSION = version;
     }
+
     @Override
     public boolean isImmutableType() {
         return false;
@@ -104,33 +103,14 @@ public class ColumnSerializer extends TypeSerializerSingleton<Column> {
     }
 
     public Column deserialize(int version, DataInputView source) throws IOException {
-        switch (version) {
-            case 0:
-            case 1: {
-                ColumnType columnType = enumSerializer.deserialize(source);
-                switch (columnType) {
-                    case METADATA:
-                        return metadataColumnSerializer.deserialize(source);
-                    case PHYSICAL:
-                        return physicalColumnSerializer.deserialize(source);
-                    default:
-                        throw new IOException("Unknown column type: " + columnType);
-                }
-            }
-            case 2: {
-                ColumnType columnType = enumSerializer.deserialize(source);
-                switch (columnType) {
-                    case METADATA:
-                        return metadataColumnSerializer.deserialize(source);
-                    case PHYSICAL:
-                        return physicalColumnSerializer.deserialize(version, source);
-                    default:
-                        throw new IOException("Unknown column type: " + columnType);
-                }
-            }
-            default: {
-                throw new IOException("Unrecognized serialization version " + version);
-            }
+        ColumnType columnType = enumSerializer.deserialize(source);
+        switch (columnType) {
+            case METADATA:
+                return metadataColumnSerializer.deserialize(source);
+            case PHYSICAL:
+                return physicalColumnSerializer.deserialize(version, source);
+            default:
+                throw new IOException("Unknown column type: " + columnType);
         }
     }
 

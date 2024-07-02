@@ -56,9 +56,9 @@ public abstract class Column implements Serializable {
     protected final @Nullable String comment;
 
     /**
-     * Save the literal value of the column's default value,
-     * For uncertain functions such as UUID(), the value is null,
-     * For the current time function such as CURRENT_TIMESTAMP(), the value is Unix Epoch time(1970-01-01 00:00:00).
+     * Save the literal value of the column's default value, For uncertain functions such as UUID(),
+     * the value is null, For the current time function such as CURRENT_TIMESTAMP(), the value is
+     * Unix Epoch time(1970-01-01 00:00:00).
      */
     protected final @Nullable String defaultValueExpression;
 
