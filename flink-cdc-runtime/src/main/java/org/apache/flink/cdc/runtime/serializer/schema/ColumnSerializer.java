@@ -46,12 +46,7 @@ public class ColumnSerializer extends TypeSerializerSingleton<Column> {
     private final MetadataColumnSerializer metadataColumnSerializer =
             MetadataColumnSerializer.INSTANCE;
 
-    /**
-     * Identify for release version:
-     * for Version 3.0.0~3.1.1 is 0,
-     * for version 3.2.0 is 1.
-     */
-    private static int CURRENT_VERSION = 1;
+    private static int CURRENT_VERSION = 2;
 
     /**
      * Update {@link #CURRENT_VERSION} as We did not directly include this version in the file.
@@ -110,7 +105,8 @@ public class ColumnSerializer extends TypeSerializerSingleton<Column> {
 
     public Column deserialize(int version, DataInputView source) throws IOException {
         switch (version) {
-            case 0: {
+            case 0:
+            case 1: {
                 ColumnType columnType = enumSerializer.deserialize(source);
                 switch (columnType) {
                     case METADATA:
@@ -121,7 +117,7 @@ public class ColumnSerializer extends TypeSerializerSingleton<Column> {
                         throw new IOException("Unknown column type: " + columnType);
                 }
             }
-            case 1: {
+            case 2: {
                 ColumnType columnType = enumSerializer.deserialize(source);
                 switch (columnType) {
                     case METADATA:
