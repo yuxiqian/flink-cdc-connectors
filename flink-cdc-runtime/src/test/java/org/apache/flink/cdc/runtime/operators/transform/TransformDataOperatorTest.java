@@ -110,8 +110,6 @@ public class TransformDataOperatorTest {
                     .physicalColumn("minute_diff", DataTypes.INT())
                     .physicalColumn("hour_diff", DataTypes.INT())
                     .physicalColumn("day_diff", DataTypes.INT())
-                    .physicalColumn("month_diff", DataTypes.INT())
-                    .physicalColumn("year_diff", DataTypes.INT())
                     .primaryKey("col1")
                     .build();
 
@@ -543,16 +541,12 @@ public class TransformDataOperatorTest {
                 DataChangeEvent.insertEvent(
                         TIMESTAMPDIFF_TABLEID,
                         recordDataGenerator.generate(
-                                new Object[] {
-                                    new BinaryStringData("2"), null, null, null, null, null, null
-                                }));
+                                new Object[] {new BinaryStringData("2"), null, null, null, null}));
         DataChangeEvent insertEventExpect2 =
                 DataChangeEvent.insertEvent(
                         TIMESTAMPDIFF_TABLEID,
                         recordDataGenerator.generate(
-                                new Object[] {
-                                    new BinaryStringData("2"), -28800, -480, -8, 0, 0, 0
-                                }));
+                                new Object[] {new BinaryStringData("2"), -28800, -480, -8, 0}));
 
         transform.processElement(new StreamRecord<>(insertEvent2));
         Assertions.assertThat(
@@ -569,18 +563,14 @@ public class TransformDataOperatorTest {
                                 "col1, TIMESTAMP_DIFF('SECOND', LOCALTIMESTAMP, CURRENT_TIMESTAMP) as second_diff,"
                                         + " TIMESTAMP_DIFF('MINUTE', LOCALTIMESTAMP, CURRENT_TIMESTAMP) as minute_diff,"
                                         + " TIMESTAMP_DIFF('HOUR', LOCALTIMESTAMP, CURRENT_TIMESTAMP) as hour_diff,"
-                                        + " TIMESTAMP_DIFF('DAY', LOCALTIMESTAMP, CURRENT_TIMESTAMP) as day_diff,"
-                                        + " TIMESTAMP_DIFF('MONTH', LOCALTIMESTAMP, CURRENT_TIMESTAMP) as month_diff,"
-                                        + " TIMESTAMP_DIFF('YEAR', LOCALTIMESTAMP, CURRENT_TIMESTAMP) as year_diff",
+                                        + " TIMESTAMP_DIFF('DAY', LOCALTIMESTAMP, CURRENT_TIMESTAMP) as day_diff",
                                 "col1='1'")
                         .addTransform(
                                 TIMESTAMPDIFF_TABLEID.identifier(),
                                 "col1, TIMESTAMP_DIFF('SECOND', LOCALTIMESTAMP, NOW()) as second_diff,"
                                         + " TIMESTAMP_DIFF('MINUTE', LOCALTIMESTAMP, NOW()) as minute_diff,"
                                         + " TIMESTAMP_DIFF('HOUR', LOCALTIMESTAMP, NOW()) as hour_diff,"
-                                        + " TIMESTAMP_DIFF('DAY', LOCALTIMESTAMP, NOW()) as day_diff,"
-                                        + " TIMESTAMP_DIFF('MONTH', LOCALTIMESTAMP, NOW()) as month_diff,"
-                                        + " TIMESTAMP_DIFF('YEAR', LOCALTIMESTAMP, NOW()) as year_diff",
+                                        + " TIMESTAMP_DIFF('DAY', LOCALTIMESTAMP, NOW()) as day_diff",
                                 "col1='2'")
                         .addTimezone("GMT-8:00")
                         .build();
@@ -599,16 +589,12 @@ public class TransformDataOperatorTest {
                 DataChangeEvent.insertEvent(
                         TIMESTAMPDIFF_TABLEID,
                         recordDataGenerator.generate(
-                                new Object[] {
-                                    new BinaryStringData("1"), null, null, null, null, null, null
-                                }));
+                                new Object[] {new BinaryStringData("1"), null, null, null, null}));
         DataChangeEvent insertEventExpect =
                 DataChangeEvent.insertEvent(
                         TIMESTAMPDIFF_TABLEID,
                         recordDataGenerator.generate(
-                                new Object[] {
-                                    new BinaryStringData("1"), -28800, -480, -8, 0, 0, 0
-                                }));
+                                new Object[] {new BinaryStringData("1"), -28800, -480, -8, 0}));
         transform.processElement(new StreamRecord<>(createTableEvent));
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
