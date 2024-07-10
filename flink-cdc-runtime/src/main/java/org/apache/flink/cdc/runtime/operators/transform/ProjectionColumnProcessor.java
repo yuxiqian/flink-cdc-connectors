@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.runtime.operators.transform;
 
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.schema.Column;
@@ -43,18 +44,26 @@ public class ProjectionColumnProcessor {
     private ProjectionColumn projectionColumn;
     private String timezone;
     private TransformExpressionKey transformExpressionKey;
+    private List<Tuple2<String, String>> udfFunctions;
 
     public ProjectionColumnProcessor(
-            TableInfo tableInfo, ProjectionColumn projectionColumn, String timezone) {
+            TableInfo tableInfo,
+            ProjectionColumn projectionColumn,
+            String timezone,
+            List<Tuple2<String, String>> udfFunctions) {
         this.tableInfo = tableInfo;
         this.projectionColumn = projectionColumn;
         this.timezone = timezone;
+        this.udfFunctions = udfFunctions;
         this.transformExpressionKey = generateTransformExpressionKey();
     }
 
     public static ProjectionColumnProcessor of(
-            TableInfo tableInfo, ProjectionColumn projectionColumn, String timezone) {
-        return new ProjectionColumnProcessor(tableInfo, projectionColumn, timezone);
+            TableInfo tableInfo,
+            ProjectionColumn projectionColumn,
+            String timezone,
+            List<Tuple2<String, String>> udfFunctions) {
+        return new ProjectionColumnProcessor(tableInfo, projectionColumn, timezone, udfFunctions);
     }
 
     public Object evaluate(BinaryRecordData after, long epochTime) {
@@ -145,7 +154,7 @@ public class ProjectionColumnProcessor {
         paramTypes.add(Long.class);
 
         return TransformExpressionKey.of(
-                JaninoCompiler.loadSystemFunction(scriptExpression),
+                JaninoCompiler.loadScalarFunctions(udfFunctions, scriptExpression),
                 argumentNames,
                 paramTypes,
                 DataTypeConverter.convertOriginalClass(projectionColumn.getDataType()));

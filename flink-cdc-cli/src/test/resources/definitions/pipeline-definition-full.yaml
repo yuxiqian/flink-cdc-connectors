@@ -52,6 +52,12 @@ transform:
     filter: uniq_id > 10
     description: add new uniq_id for each row
 
+udf:
+  - name: substring
+    classpath: com.example.functions.scalar.SubStringFunctionClass
+  - name: encrypt
+    classpath: com.example.functions.scalar.EncryptFunctionClass
+
 pipeline:
   name: source-database-sync-pipe
   parallelism: 4

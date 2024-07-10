@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.composer.flink.translator;
 
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.composer.definition.TransformDef;
 import org.apache.flink.cdc.runtime.operators.transform.TransformDataOperator;
@@ -34,7 +35,9 @@ import java.util.List;
 public class TransformTranslator {
 
     public DataStream<Event> translateSchema(
-            DataStream<Event> input, List<TransformDef> transforms) {
+            DataStream<Event> input,
+            List<TransformDef> transforms,
+            List<Tuple2<String, String>> udfFunctions) {
         if (transforms.isEmpty()) {
             return input;
         }
@@ -51,6 +54,7 @@ public class TransformTranslator {
                         transform.getTableOptions());
             }
         }
+        transformSchemaFunctionBuilder.addUdfFunctions(udfFunctions);
         return input.transform(
                 "Transform:Schema", new EventTypeInfo(), transformSchemaFunctionBuilder.build());
     }
@@ -59,7 +63,8 @@ public class TransformTranslator {
             DataStream<Event> input,
             List<TransformDef> transforms,
             OperatorID schemaOperatorID,
-            String timezone) {
+            String timezone,
+            List<Tuple2<String, String>> udfFunctions) {
         if (transforms.isEmpty()) {
             return input;
         }
@@ -76,6 +81,7 @@ public class TransformTranslator {
         }
         transformDataFunctionBuilder.addSchemaOperatorID(schemaOperatorID);
         transformDataFunctionBuilder.addTimezone(timezone);
+        transformDataFunctionBuilder.addUdfFunctions(udfFunctions);
         return input.transform(
                 "Transform:Data", new EventTypeInfo(), transformDataFunctionBuilder.build());
     }

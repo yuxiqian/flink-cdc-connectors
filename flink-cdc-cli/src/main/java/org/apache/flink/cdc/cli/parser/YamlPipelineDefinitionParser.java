@@ -24,6 +24,7 @@ import org.apache.flink.cdc.composer.definition.RouteDef;
 import org.apache.flink.cdc.composer.definition.SinkDef;
 import org.apache.flink.cdc.composer.definition.SourceDef;
 import org.apache.flink.cdc.composer.definition.TransformDef;
+import org.apache.flink.cdc.composer.definition.UdfDef;
 
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.type.TypeReference;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
@@ -46,6 +47,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     private static final String SINK_KEY = "sink";
     private static final String ROUTE_KEY = "route";
     private static final String TRANSFORM_KEY = "transform";
+    private static final String UDF_KEY = "udf";
     private static final String PIPELINE_KEY = "pipeline";
 
     // Source / sink keys
@@ -62,6 +64,10 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     private static final String TRANSFORM_PROJECTION_KEY = "projection";
     private static final String TRANSFORM_FILTER_KEY = "filter";
     private static final String TRANSFORM_DESCRIPTION_KEY = "description";
+
+    // UDF keys
+    private static final String UDF_FUNCTION_NAME_KEY = "name";
+    private static final String UDF_CLASSPATH_KEY = "classpath";
 
     public static final String TRANSFORM_PRIMARY_KEY_KEY = "primary-keys";
 
@@ -106,6 +112,11 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         Optional.ofNullable(root.get(ROUTE_KEY))
                 .ifPresent(node -> node.forEach(route -> routeDefs.add(toRouteDef(route))));
 
+        // Udfs are optional
+        List<UdfDef> udfDefs = new ArrayList<>();
+        Optional.ofNullable(root.get(UDF_KEY))
+                .ifPresent(node -> node.forEach(udf -> udfDefs.add(toUdfDef(udf))));
+
         // Pipeline configs are optional
         Configuration userPipelineConfig = toPipelineConfig(root.get(PIPELINE_KEY));
 
@@ -114,7 +125,8 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         pipelineConfig.addAll(globalPipelineConfig);
         pipelineConfig.addAll(userPipelineConfig);
 
-        return new PipelineDef(sourceDef, sinkDef, routeDefs, transformDefs, pipelineConfig);
+        return new PipelineDef(
+                sourceDef, sinkDef, routeDefs, transformDefs, udfDefs, pipelineConfig);
     }
 
     private SourceDef toSourceDef(JsonNode sourceNode) {
@@ -169,6 +181,23 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                         .map(JsonNode::asText)
                         .orElse(null);
         return new RouteDef(sourceTable, sinkTable, description);
+    }
+
+    private UdfDef toUdfDef(JsonNode udfNode) {
+        String functionName =
+                checkNotNull(
+                                udfNode.get(UDF_FUNCTION_NAME_KEY),
+                                "Missing required field \"%s\" in UDF configuration",
+                                UDF_FUNCTION_NAME_KEY)
+                        .asText();
+        String classPath =
+                checkNotNull(
+                                udfNode.get(UDF_CLASSPATH_KEY),
+                                "Missing required field \"%s\" in UDF configuration",
+                                UDF_CLASSPATH_KEY)
+                        .asText();
+
+        return new UdfDef(functionName, classPath);
     }
 
     private TransformDef toTransformDef(JsonNode transformNode) {
