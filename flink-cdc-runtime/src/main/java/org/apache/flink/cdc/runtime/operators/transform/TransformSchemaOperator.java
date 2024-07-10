@@ -58,6 +58,7 @@ public class TransformSchemaOperator extends AbstractStreamOperator<Event>
     private transient Map<TableId, TransformProjectionProcessor> processorMap;
     private final List<Tuple2<Selectors, SchemaMetadataTransform>> schemaMetadataTransformers;
     private transient ListState<byte[]> state;
+    private final List<Tuple2<String, String>> udfFunctions;
 
     public static TransformSchemaOperator.Builder newBuilder() {
         return new TransformSchemaOperator.Builder();
@@ -67,6 +68,8 @@ public class TransformSchemaOperator extends AbstractStreamOperator<Event>
     public static class Builder {
         private final List<Tuple5<String, String, String, String, String>> transformRules =
                 new ArrayList<>();
+
+        private final List<Tuple2<String, String>> udfFunctions = new ArrayList<>();
 
         public TransformSchemaOperator.Builder addTransform(
                 String tableInclusions,
@@ -79,18 +82,26 @@ public class TransformSchemaOperator extends AbstractStreamOperator<Event>
             return this;
         }
 
+        public TransformSchemaOperator.Builder addUdfFunctions(
+                List<Tuple2<String, String>> udfFunctions) {
+            this.udfFunctions.addAll(udfFunctions);
+            return this;
+        }
+
         public TransformSchemaOperator build() {
-            return new TransformSchemaOperator(transformRules);
+            return new TransformSchemaOperator(transformRules, udfFunctions);
         }
     }
 
     private TransformSchemaOperator(
-            List<Tuple5<String, String, String, String, String>> transformRules) {
+            List<Tuple5<String, String, String, String, String>> transformRules,
+            List<Tuple2<String, String>> udfFunctions) {
         this.transformRules = transformRules;
         this.tableChangeInfoMap = new ConcurrentHashMap<>();
         this.processorMap = new ConcurrentHashMap<>();
         this.schemaMetadataTransformers = new ArrayList<>();
         this.chainingStrategy = ChainingStrategy.ALWAYS;
+        this.udfFunctions = udfFunctions;
     }
 
     @Override
@@ -216,7 +227,8 @@ public class TransformSchemaOperator extends AbstractStreamOperator<Event>
                 if (transformProjection.isValid()) {
                     if (!processorMap.containsKey(tableId)) {
                         processorMap.put(
-                                tableId, TransformProjectionProcessor.of(transformProjection));
+                                tableId,
+                                TransformProjectionProcessor.of(transformProjection, udfFunctions));
                     }
                     TransformProjectionProcessor transformProjectionProcessor =
                             processorMap.get(tableId);
@@ -271,7 +283,9 @@ public class TransformSchemaOperator extends AbstractStreamOperator<Event>
         TableChangeInfo tableChangeInfo = tableChangeInfoMap.get(tableId);
         if (!processorMap.containsKey(tableId) || !processorMap.get(tableId).hasTableChangeInfo()) {
             processorMap.put(
-                    tableId, TransformProjectionProcessor.of(tableChangeInfo, transformProjection));
+                    tableId,
+                    TransformProjectionProcessor.of(
+                            tableChangeInfo, transformProjection, udfFunctions));
         }
         TransformProjectionProcessor transformProjectionProcessor = processorMap.get(tableId);
         BinaryRecordData before = (BinaryRecordData) dataChangeEvent.before();

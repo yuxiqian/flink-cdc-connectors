@@ -35,6 +35,7 @@ import java.io.StringWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.TimeZone;
 
@@ -118,7 +119,7 @@ public class JaninoCompilerTest {
         List<Object> params = Arrays.asList(epochTime);
         ExpressionEvaluator expressionEvaluator =
                 JaninoCompiler.compileExpression(
-                        JaninoCompiler.loadSystemFunction(expression),
+                        JaninoCompiler.loadScalarFunctions(Collections.emptyList(), expression),
                         columnNames,
                         paramTypes,
                         TimestampData.class);
@@ -134,7 +135,7 @@ public class JaninoCompilerTest {
         List<Object> params = new ArrayList<>();
         ExpressionEvaluator expressionEvaluator =
                 JaninoCompiler.compileExpression(
-                        JaninoCompiler.loadSystemFunction(expression),
+                        JaninoCompiler.loadScalarFunctions(Collections.emptyList(), expression),
                         columnNames,
                         paramTypes,
                         Double.class);

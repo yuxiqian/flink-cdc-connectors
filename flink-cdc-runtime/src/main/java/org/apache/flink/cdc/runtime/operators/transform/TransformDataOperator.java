@@ -71,6 +71,8 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
     /** keep the relationship of TableId and table information. */
     private final Map<TableId, TableInfo> tableInfoMap;
 
+    private final List<Tuple2<String, String>> udfFunctions;
+
     private transient Map<Tuple2<TableId, TransformProjection>, TransformProjectionProcessor>
             transformProjectionProcessorMap;
     private transient Map<Tuple2<TableId, TransformFilter>, TransformFilterProcessor>
@@ -85,6 +87,7 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
         private final List<Tuple3<String, String, String>> transformRules = new ArrayList<>();
         private OperatorID schemaOperatorID;
         private String timezone;
+        private List<Tuple2<String, String>> udfFunctions = new ArrayList<>();
 
         public TransformDataOperator.Builder addTransform(
                 String tableInclusions, @Nullable String projection, @Nullable String filter) {
@@ -106,21 +109,30 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
             return this;
         }
 
+        public TransformDataOperator.Builder addUdfFunctions(
+                List<Tuple2<String, String>> udfFunctions) {
+            this.udfFunctions.addAll(udfFunctions);
+            return this;
+        }
+
         public TransformDataOperator build() {
-            return new TransformDataOperator(transformRules, schemaOperatorID, timezone);
+            return new TransformDataOperator(
+                    transformRules, schemaOperatorID, timezone, udfFunctions);
         }
     }
 
     private TransformDataOperator(
             List<Tuple3<String, String, String>> transformRules,
             OperatorID schemaOperatorID,
-            String timezone) {
+            String timezone,
+            List<Tuple2<String, String>> udfFunctions) {
         this.transformRules = transformRules;
         this.schemaOperatorID = schemaOperatorID;
         this.timezone = timezone;
         this.tableInfoMap = new ConcurrentHashMap<>();
         this.transformFilterProcessorMap = new ConcurrentHashMap<>();
         this.transformProjectionProcessorMap = new ConcurrentHashMap<>();
+        this.udfFunctions = udfFunctions;
     }
 
     @Override
@@ -234,7 +246,7 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
                             Tuple2.of(tableId, transformProjection))) {
                         transformProjectionProcessorMap.put(
                                 Tuple2.of(tableId, transformProjection),
-                                TransformProjectionProcessor.of(transformProjection));
+                                TransformProjectionProcessor.of(transformProjection, udfFunctions));
                     }
                     TransformProjectionProcessor transformProjectionProcessor =
                             transformProjectionProcessorMap.get(
@@ -272,7 +284,8 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
                                 TransformProjectionProcessor.of(
                                         getTableInfoFromSchemaEvolutionClient(tableId),
                                         transformProjection,
-                                        timezone));
+                                        timezone,
+                                        udfFunctions));
                     }
                     TransformProjectionProcessor transformProjectionProcessor =
                             transformProjectionProcessorMap.get(
@@ -294,7 +307,8 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
                                 TransformFilterProcessor.of(
                                         getTableInfoFromSchemaEvolutionClient(tableId),
                                         transformFilter,
-                                        timezone));
+                                        timezone,
+                                        udfFunctions));
                     }
                     TransformFilterProcessor transformFilterProcessor =
                             transformFilterProcessorMap.get(Tuple2.of(tableId, transformFilter));
@@ -319,7 +333,8 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
                                 TransformProjectionProcessor.of(
                                         getTableInfoFromSchemaEvolutionClient(tableId),
                                         transformProjection,
-                                        timezone));
+                                        timezone,
+                                        udfFunctions));
                     }
                     TransformProjectionProcessor transformProjectionProcessor =
                             transformProjectionProcessorMap.get(

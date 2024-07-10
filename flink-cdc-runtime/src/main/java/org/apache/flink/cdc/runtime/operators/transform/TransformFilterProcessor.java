@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.runtime.operators.transform;
 
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.schema.Column;
@@ -39,18 +40,26 @@ public class TransformFilterProcessor {
     private TransformFilter transformFilter;
     private String timezone;
     private TransformExpressionKey transformExpressionKey;
+    private List<Tuple2<String, String>> udfFunctions;
 
     public TransformFilterProcessor(
-            TableInfo tableInfo, TransformFilter transformFilter, String timezone) {
+            TableInfo tableInfo,
+            TransformFilter transformFilter,
+            String timezone,
+            List<Tuple2<String, String>> udfFunctions) {
         this.tableInfo = tableInfo;
         this.transformFilter = transformFilter;
         this.timezone = timezone;
+        this.udfFunctions = udfFunctions;
         transformExpressionKey = generateTransformExpressionKey();
     }
 
     public static TransformFilterProcessor of(
-            TableInfo tableInfo, TransformFilter transformFilter, String timezone) {
-        return new TransformFilterProcessor(tableInfo, transformFilter, timezone);
+            TableInfo tableInfo,
+            TransformFilter transformFilter,
+            String timezone,
+            List<Tuple2<String, String>> udfFunctions) {
+        return new TransformFilterProcessor(tableInfo, transformFilter, timezone, udfFunctions);
     }
 
     public boolean process(BinaryRecordData after, long epochTime) {
@@ -140,7 +149,7 @@ public class TransformFilterProcessor {
         paramTypes.add(Long.class);
 
         return TransformExpressionKey.of(
-                JaninoCompiler.loadSystemFunction(scriptExpression),
+                JaninoCompiler.loadScalarFunctions(udfFunctions, scriptExpression),
                 argumentNames,
                 paramTypes,
                 Boolean.class);

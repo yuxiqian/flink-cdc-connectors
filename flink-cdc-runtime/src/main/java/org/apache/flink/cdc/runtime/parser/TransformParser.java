@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.runtime.parser;
 
 import org.apache.flink.api.common.io.ParseException;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
@@ -40,7 +41,12 @@ import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.schema.ScalarFunction;
+import org.apache.calcite.schema.SchemaPlus;
+import org.apache.calcite.schema.impl.ScalarFunctionImpl;
 import org.apache.calcite.sql.SqlBasicCall;
+import org.apache.calcite.sql.SqlFunction;
+import org.apache.calcite.sql.SqlFunctionCategory;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
@@ -50,7 +56,10 @@ import org.apache.calcite.sql.fun.SqlCase;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
+import org.apache.calcite.sql.type.InferTypes;
+import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
+import org.apache.calcite.sql.util.ListSqlOperatorTable;
 import org.apache.calcite.sql.util.SqlOperatorTables;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.calcite.sql.validate.SqlValidator;
@@ -87,15 +96,34 @@ public class TransformParser {
                         .withLex(Lex.JAVA));
     }
 
-    private static RelNode sqlToRel(List<Column> columns, SqlNode sqlNode) {
+    private static RelNode sqlToRel(
+            List<Column> columns, SqlNode sqlNode, List<Tuple2<String, String>> udfs) {
         List<Column> columnsWithMetadata = copyFillMetadataColumn(sqlNode.toString(), columns);
         CalciteSchema rootSchema = CalciteSchema.createRootSchema(true);
+        SchemaPlus schema = rootSchema.plus();
         Map<String, Object> operand = new HashMap<>();
         operand.put("tableName", DEFAULT_TABLE);
         operand.put("columns", columnsWithMetadata);
         rootSchema.add(
                 DEFAULT_SCHEMA,
-                TransformSchemaFactory.INSTANCE.create(rootSchema.plus(), DEFAULT_SCHEMA, operand));
+                TransformSchemaFactory.INSTANCE.create(schema, DEFAULT_SCHEMA, operand));
+        List<SqlFunction> udfFunctions = new ArrayList<>();
+        for (Tuple2<String, String> udf : udfs) {
+            try {
+                ScalarFunction function = ScalarFunctionImpl.create(Class.forName(udf.f1), udf.f0);
+                schema.add(udf.f0.toUpperCase(), function);
+                udfFunctions.add(
+                        new SqlFunction(
+                                udf.f0,
+                                SqlKind.OTHER_FUNCTION,
+                                o -> function.getReturnType(o.getTypeFactory()),
+                                InferTypes.RETURN_TYPE,
+                                OperandTypes.VARIADIC,
+                                SqlFunctionCategory.USER_DEFINED_FUNCTION));
+            } catch (ClassNotFoundException e) {
+                throw new RuntimeException("Failed to resolve UDF at classpath " + udf.f1);
+            }
+        }
         SqlTypeFactoryImpl factory = new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT);
         CalciteCatalogReader calciteCatalogReader =
                 new CalciteCatalogReader(
@@ -105,9 +133,13 @@ public class TransformParser {
                         new CalciteConnectionConfigImpl(new Properties()));
         TransformSqlOperatorTable transformSqlOperatorTable = TransformSqlOperatorTable.instance();
         SqlStdOperatorTable sqlStdOperatorTable = SqlStdOperatorTable.instance();
+        ListSqlOperatorTable udfOperatorTable = new ListSqlOperatorTable();
+        udfFunctions.forEach(udfOperatorTable::add);
+
         SqlValidator validator =
                 SqlValidatorUtil.newValidator(
-                        SqlOperatorTables.chain(sqlStdOperatorTable, transformSqlOperatorTable),
+                        SqlOperatorTables.chain(
+                                sqlStdOperatorTable, transformSqlOperatorTable, udfOperatorTable),
                         calciteCatalogReader,
                         factory,
                         SqlValidator.Config.DEFAULT.withIdentifierExpansion(true));
@@ -143,7 +175,9 @@ public class TransformParser {
 
     // Parse all columns
     public static List<ProjectionColumn> generateProjectionColumns(
-            String projectionExpression, List<Column> columns) {
+            String projectionExpression,
+            List<Column> columns,
+            List<Tuple2<String, String>> udfFunctions) {
         if (StringUtils.isNullOrWhitespaceOnly(projectionExpression)) {
             return new ArrayList<>();
         }
@@ -151,7 +185,7 @@ public class TransformParser {
         if (sqlSelect.getSelectList().isEmpty()) {
             return new ArrayList<>();
         }
-        RelNode relNode = sqlToRel(columns, sqlSelect);
+        RelNode relNode = sqlToRel(columns, sqlSelect, udfFunctions);
         Map<String, RelDataType> relDataTypeMap =
                 relNode.getRowType().getFieldList().stream()
                         .collect(

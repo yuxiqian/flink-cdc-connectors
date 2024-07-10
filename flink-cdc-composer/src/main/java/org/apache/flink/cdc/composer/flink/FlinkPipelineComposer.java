@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.composer.flink;
 
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.Event;
@@ -49,6 +50,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /** Composer for translating data pipeline to a Flink DataStream job. */
 @Internal
@@ -95,6 +97,11 @@ public class FlinkPipelineComposer implements PipelineComposer {
         int parallelism = pipelineDef.getConfig().get(PipelineOptions.PIPELINE_PARALLELISM);
         env.getConfig().setParallelism(parallelism);
 
+        List<Tuple2<String, String>> udfFunctions =
+                pipelineDef.getUdfs().stream()
+                        .map(udf -> Tuple2.of(udf.getName(), udf.getClassPath()))
+                        .collect(Collectors.toList());
+
         // Build Source Operator
         DataSourceTranslator sourceTranslator = new DataSourceTranslator();
         DataStream<Event> stream =
@@ -102,7 +109,9 @@ public class FlinkPipelineComposer implements PipelineComposer {
 
         // Build TransformSchemaOperator for processing Schema Event
         TransformTranslator transformTranslator = new TransformTranslator();
-        stream = transformTranslator.translateSchema(stream, pipelineDef.getTransforms());
+        stream =
+                transformTranslator.translateSchema(
+                        stream, pipelineDef.getTransforms(), udfFunctions);
 
         // Schema operator
         SchemaOperatorTranslator schemaOperatorTranslator =
@@ -123,7 +132,8 @@ public class FlinkPipelineComposer implements PipelineComposer {
                         stream,
                         pipelineDef.getTransforms(),
                         schemaOperatorIDGenerator.generate(),
-                        pipelineDef.getConfig().get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE));
+                        pipelineDef.getConfig().get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE),
+                        udfFunctions);
 
         // Build DataSink in advance as schema operator requires MetadataApplier
         DataSink dataSink = createDataSink(pipelineDef.getSink(), pipelineDef.getConfig());

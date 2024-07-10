@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.runtime.operators.transform;
 
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
@@ -52,17 +53,20 @@ public class TransformProjectionProcessor {
     private TransformProjection transformProjection;
     private String timezone;
     private Map<String, ProjectionColumnProcessor> projectionColumnProcessorMap;
+    private List<Tuple2<String, String>> udfFunctions;
 
     public TransformProjectionProcessor(
             TableInfo tableInfo,
             TableChangeInfo tableChangeInfo,
             TransformProjection transformProjection,
-            String timezone) {
+            String timezone,
+            List<Tuple2<String, String>> udfFunctions) {
         this.tableInfo = tableInfo;
         this.tableChangeInfo = tableChangeInfo;
         this.transformProjection = transformProjection;
         this.timezone = timezone;
         this.projectionColumnProcessorMap = new ConcurrentHashMap<>();
+        this.udfFunctions = udfFunctions;
     }
 
     public boolean hasTableChangeInfo() {
@@ -74,24 +78,34 @@ public class TransformProjectionProcessor {
     }
 
     public static TransformProjectionProcessor of(
-            TableInfo tableInfo, TransformProjection transformProjection, String timezone) {
-        return new TransformProjectionProcessor(tableInfo, null, transformProjection, timezone);
+            TableInfo tableInfo,
+            TransformProjection transformProjection,
+            String timezone,
+            List<Tuple2<String, String>> udfFunctions) {
+        return new TransformProjectionProcessor(
+                tableInfo, null, transformProjection, timezone, udfFunctions);
     }
 
     public static TransformProjectionProcessor of(
-            TableChangeInfo tableChangeInfo, TransformProjection transformProjection) {
-        return new TransformProjectionProcessor(null, tableChangeInfo, transformProjection, null);
+            TableChangeInfo tableChangeInfo,
+            TransformProjection transformProjection,
+            List<Tuple2<String, String>> udfFunctions) {
+        return new TransformProjectionProcessor(
+                null, tableChangeInfo, transformProjection, null, udfFunctions);
     }
 
-    public static TransformProjectionProcessor of(TransformProjection transformProjection) {
-        return new TransformProjectionProcessor(null, null, transformProjection, null);
+    public static TransformProjectionProcessor of(
+            TransformProjection transformProjection, List<Tuple2<String, String>> udfFunctions) {
+        return new TransformProjectionProcessor(
+                null, null, transformProjection, null, udfFunctions);
     }
 
     public CreateTableEvent processCreateTableEvent(CreateTableEvent createTableEvent) {
         List<ProjectionColumn> projectionColumns =
                 TransformParser.generateProjectionColumns(
                         transformProjection.getProjection(),
-                        createTableEvent.getSchema().getColumns());
+                        createTableEvent.getSchema().getColumns(),
+                        udfFunctions);
         transformProjection.setProjectionColumns(projectionColumns);
         List<Column> allColumnList = transformProjection.getAllColumnList();
         // add the column of projection into Schema
@@ -102,7 +116,7 @@ public class TransformProjectionProcessor {
     public void processSchemaChangeEvent(Schema schema) {
         List<ProjectionColumn> projectionColumns =
                 TransformParser.generateProjectionColumns(
-                        transformProjection.getProjection(), schema.getColumns());
+                        transformProjection.getProjection(), schema.getColumns(), udfFunctions);
         transformProjection.setProjectionColumns(projectionColumns);
     }
 
@@ -144,7 +158,7 @@ public class TransformProjectionProcessor {
                         projectionColumnProcessorMap.put(
                                 projectionColumn.getColumnName(),
                                 ProjectionColumnProcessor.of(
-                                        tableInfo, projectionColumn, timezone));
+                                        tableInfo, projectionColumn, timezone, udfFunctions));
                     }
                     ProjectionColumnProcessor projectionColumnProcessor =
                             projectionColumnProcessorMap.get(projectionColumn.getColumnName());

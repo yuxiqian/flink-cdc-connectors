@@ -24,6 +24,7 @@ import org.apache.flink.cdc.composer.definition.RouteDef;
 import org.apache.flink.cdc.composer.definition.SinkDef;
 import org.apache.flink.cdc.composer.definition.SourceDef;
 import org.apache.flink.cdc.composer.definition.TransformDef;
+import org.apache.flink.cdc.composer.definition.UdfDef;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 import org.apache.flink.shaded.guava31.com.google.common.io.Resources;
@@ -230,6 +231,13 @@ class YamlPipelineDefinitionParserTest {
                                     null,
                                     null,
                                     "add new uniq_id for each row")),
+                    Arrays.asList(
+                            new UdfDef(
+                                    "substring",
+                                    "com.example.functions.scalar.SubStringFunctionClass"),
+                            new UdfDef(
+                                    "encrypt",
+                                    "com.example.functions.scalar.EncryptFunctionClass")),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
                                     .put("name", "source-database-sync-pipe")
@@ -293,6 +301,13 @@ class YamlPipelineDefinitionParserTest {
                                     null,
                                     null,
                                     "add new uniq_id for each row")),
+                    Arrays.asList(
+                            new UdfDef(
+                                    "substring",
+                                    "com.example.functions.scalar.SubStringFunctionClass"),
+                            new UdfDef(
+                                    "encrypt",
+                                    "com.example.functions.scalar.EncryptFunctionClass")),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
                                     .put("name", "source-database-sync-pipe")
@@ -330,6 +345,7 @@ class YamlPipelineDefinitionParserTest {
                                     null,
                                     null)),
                     Collections.emptyList(),
+                    Collections.emptyList(),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
                                     .put("parallelism", "4")
@@ -339,6 +355,7 @@ class YamlPipelineDefinitionParserTest {
             new PipelineDef(
                     new SourceDef("mysql", null, new Configuration()),
                     new SinkDef("kafka", null, new Configuration()),
+                    Collections.emptyList(),
                     Collections.emptyList(),
                     Collections.emptyList(),
                     Configuration.fromMap(Collections.singletonMap("parallelism", "1")));

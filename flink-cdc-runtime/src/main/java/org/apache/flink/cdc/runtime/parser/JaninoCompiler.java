@@ -19,6 +19,7 @@ package org.apache.flink.cdc.runtime.parser;
 
 import org.apache.flink.api.common.InvalidProgramException;
 import org.apache.flink.api.common.io.ParseException;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.utils.StringUtils;
 
 import org.apache.calcite.sql.SqlBasicCall;
@@ -37,6 +38,7 @@ import org.codehaus.janino.Java;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Use Janino compiler to compiler the statement of flink cdc pipeline transform into the executable
@@ -57,8 +59,12 @@ public class JaninoCompiler {
     public static final String DEFAULT_EPOCH_TIME = "__epoch_time__";
     public static final String DEFAULT_TIME_ZONE = "__time_zone__";
 
-    public static String loadSystemFunction(String expression) {
+    public static String loadScalarFunctions(
+            List<Tuple2<String, String>> udfFunctions, String expression) {
         return "import static org.apache.flink.cdc.runtime.functions.SystemFunctionUtils.*;"
+                + udfFunctions.stream()
+                        .map(udf -> "import static " + udf.f1 + "." + udf.f0 + ";")
+                        .collect(Collectors.joining())
                 + expression;
     }
 
