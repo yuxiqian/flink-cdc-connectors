@@ -31,14 +31,11 @@ jobs:
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           numberOfReviewers: 1
+          # Only repository collaborators could be assigned as reviewers.
           reviewers: |
             leonardBang
             ruanhang1993
             GOODBOY008
             PatrickRen
             Jiabao-Sun
-            loserwang1024
-            lvyanquan
-            yuxiqian
-
           skipKeywords: wip, draft
