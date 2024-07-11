@@ -18,7 +18,7 @@
 name: 'Close stale issues and PRs'
 on:
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '* * * * *'
 permissions:
   # Stale recommended permissions
   pull-requests: write
@@ -41,8 +41,8 @@ jobs:
           close-issue-message: >
             This issue has been closed because Flink CDC doesn't use GitHub issue trackers.
           # Stale PRs
-          days-before-pr-stale: 120
-          days-before-pr-close: 7
+          days-before-pr-stale: 1
+          days-before-pr-close: 0
           stale-pr-message: >
             This pull request has been automatically marked as stale because it has not had recent
             activity for 120 days. It will be closed in 7 days if no further activity occurs.
