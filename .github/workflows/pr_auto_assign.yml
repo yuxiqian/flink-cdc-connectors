@@ -17,6 +17,8 @@ name: Auto Assign
 on:
   pull_request:
     types: [opened, edited, labeled, unlabeled]
+permissions:
+  pull-requests: write
 jobs:
   run:
     runs-on: ubuntu-latest
@@ -28,6 +30,7 @@ jobs:
       - uses: ./.github/actions/auto-assign
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          numberOfReviewers: 1
           reviewers: |
             leonardBang
             ruanhang1993
