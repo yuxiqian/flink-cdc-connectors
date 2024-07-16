@@ -19,7 +19,7 @@ package org.apache.flink.cdc.migration.tests;
 
 import org.apache.flink.cdc.runtime.operators.transform.TableChangeInfo;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import static org.apache.flink.cdc.migration.tests.MigrationTestBase.FlinkCdcVersion.v3_0_0;
 import static org.apache.flink.cdc.migration.tests.MigrationTestBase.FlinkCdcVersion.v3_0_1;
@@ -31,7 +31,7 @@ public class TableChangeInfoMigrationTest extends MigrationTestBase {
     public static String mockCaseName = "TableChangeInfoMigrationMock";
 
     @Test
-    public void testMigration() throws Exception {
+    void testMigration() throws Exception {
         // Transform feature does not present until 3.1.0, and
         // CDC 3.1.0 breaks backwards compatibility.
         for (FlinkCdcVersion version : getAllVersionExcept(v3_0_0, v3_0_1, v3_1_0)) {

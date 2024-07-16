@@ -17,13 +17,14 @@
 
 package org.apache.flink.cdc.migration.tests;
 
-import org.junit.Assert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** Utilities for migration tests. */
 public class MigrationTestBase {
@@ -107,11 +108,17 @@ public class MigrationTestBase {
         Class<?> toVersionMockClass = getMockClass(toVersion, caseName);
         Object toVersionMockObject = toVersionMockClass.newInstance();
 
-        Assert.assertTrue(
-                (boolean)
-                        toVersionMockClass
-                                .getDeclaredMethod(
-                                        "deserializeAndCheckObject", int.class, byte[].class)
-                                .invoke(toVersionMockObject, serializerVersion, serializedObject));
+        assertThat(
+                        (boolean)
+                                toVersionMockClass
+                                        .getDeclaredMethod(
+                                                "deserializeAndCheckObject",
+                                                int.class,
+                                                byte[].class)
+                                        .invoke(
+                                                toVersionMockObject,
+                                                serializerVersion,
+                                                serializedObject))
+                .isTrue();
     }
 }

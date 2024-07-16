@@ -26,8 +26,7 @@ import org.codehaus.janino.Java;
 import org.codehaus.janino.Parser;
 import org.codehaus.janino.Scanner;
 import org.codehaus.janino.Unparser;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.io.StringReader;
@@ -38,21 +37,23 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.TimeZone;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 /** Unit tests for the {@link JaninoCompiler}. */
 public class JaninoCompilerTest {
 
     @Test
-    public void testJaninoParser() throws CompileException, IOException, InvocationTargetException {
+    void testJaninoParser() throws CompileException, IOException, InvocationTargetException {
         String expression = "1==2";
         Parser parser = new Parser(new Scanner(null, new StringReader(expression)));
         ExpressionEvaluator expressionEvaluator = new ExpressionEvaluator();
         expressionEvaluator.cook(parser);
         Object evaluate = expressionEvaluator.evaluate();
-        Assert.assertEquals(false, evaluate);
+        assertThat(evaluate).isEqualTo(false);
     }
 
     @Test
-    public void testJaninoUnParser() {
+    void testJaninoUnParser() {
         String expression = "1 <= 2";
         String[] values = new String[1];
         values[0] = "1";
@@ -66,11 +67,11 @@ public class JaninoCompilerTest {
         Unparser unparser = new Unparser(writer);
         unparser.unparseAtom(binaryOperation);
         unparser.close();
-        Assert.assertEquals(expression, writer.toString());
+        assertThat(writer.toString()).isEqualTo(expression);
     }
 
     @Test
-    public void testJaninoNumericCompare() throws InvocationTargetException {
+    void testJaninoNumericCompare() throws InvocationTargetException {
         String expression = "col1==3.14";
         List<String> columnNames = Arrays.asList("col1");
         List<Class<?>> paramTypes = Arrays.asList(Double.class);
@@ -79,11 +80,11 @@ public class JaninoCompilerTest {
                 JaninoCompiler.compileExpression(
                         expression, columnNames, paramTypes, Boolean.class);
         Object evaluate = expressionEvaluator.evaluate(params.toArray());
-        Assert.assertEquals(true, evaluate);
+        assertThat(evaluate).isEqualTo(true);
     }
 
     @Test
-    public void testJaninoCharCompare() throws InvocationTargetException {
+    void testJaninoCharCompare() throws InvocationTargetException {
         String expression = "String.valueOf('2').equals(col1)";
         List<String> columnNames = Arrays.asList("col1");
         List<Class<?>> paramTypes = Arrays.asList(String.class);
@@ -92,11 +93,11 @@ public class JaninoCompilerTest {
                 JaninoCompiler.compileExpression(
                         expression, columnNames, paramTypes, Boolean.class);
         Object evaluate = expressionEvaluator.evaluate(params.toArray());
-        Assert.assertEquals(true, evaluate);
+        assertThat(evaluate).isEqualTo(true);
     }
 
     @Test
-    public void testJaninoStringCompare() throws InvocationTargetException {
+    void testJaninoStringCompare() throws InvocationTargetException {
         String expression = "String.valueOf(\"metadata_table\").equals(__table_name__)";
         List<String> columnNames = Arrays.asList("__table_name__");
         List<Class<?>> paramTypes = Arrays.asList(String.class);
@@ -105,11 +106,11 @@ public class JaninoCompilerTest {
                 JaninoCompiler.compileExpression(
                         expression, columnNames, paramTypes, Boolean.class);
         Object evaluate = expressionEvaluator.evaluate(params.toArray());
-        Assert.assertEquals(true, evaluate);
+        assertThat(evaluate).isEqualTo(true);
     }
 
     @Test
-    public void testJaninoTimestampFunction() throws InvocationTargetException {
+    void testJaninoTimestampFunction() throws InvocationTargetException {
         long epochTime = System.currentTimeMillis();
         long localTime = epochTime + TimeZone.getTimeZone("GMT-8:00").getOffset(epochTime);
         String expression = "currentTimestamp(epochTime, \"GMT-8:00\")";
@@ -123,11 +124,11 @@ public class JaninoCompilerTest {
                         paramTypes,
                         TimestampData.class);
         Object evaluate = expressionEvaluator.evaluate(params.toArray());
-        Assert.assertEquals(TimestampData.fromMillis(localTime), evaluate);
+        assertThat(evaluate).isEqualTo(TimestampData.fromMillis(localTime));
     }
 
     @Test
-    public void testBuildInFunction() throws InvocationTargetException {
+    void testBuildInFunction() throws InvocationTargetException {
         String expression = "ceil(2.4)";
         List<String> columnNames = new ArrayList<>();
         List<Class<?>> paramTypes = new ArrayList<>();
@@ -139,6 +140,6 @@ public class JaninoCompilerTest {
                         paramTypes,
                         Double.class);
         Object evaluate = expressionEvaluator.evaluate(params.toArray());
-        Assert.assertEquals(3.0, evaluate);
+        assertThat(evaluate).isEqualTo(3.0);
     }
 }

@@ -43,13 +43,14 @@ import org.apache.calcite.sql2rel.RelDecorrelator;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.sql2rel.StandardConvertletTable;
 import org.apache.calcite.tools.RelBuilder;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** Unit tests for the {@link TransformParser}. */
 public class TransformParserTest {
@@ -62,17 +63,17 @@ public class TransformParserTest {
                     .build();
 
     @Test
-    public void testCalciteParser() {
+    void testCalciteParser() {
         SqlSelect parse =
                 TransformParser.parseSelect(
                         "select CONCAT(id, order_id) as uniq_id, * from tb where uniq_id > 10 and id is not null");
-        Assert.assertEquals(
-                "`CONCAT`(`id`, `order_id`) AS `uniq_id`, *", parse.getSelectList().toString());
-        Assert.assertEquals("`uniq_id` > 10 AND `id` IS NOT NULL", parse.getWhere().toString());
+        assertThat(parse.getSelectList().toString())
+                .isEqualTo("`CONCAT`(`id`, `order_id`) AS `uniq_id`, *");
+        assertThat(parse.getWhere().toString()).isEqualTo("`uniq_id` > 10 AND `id` IS NOT NULL");
     }
 
     @Test
-    public void testTransformCalciteValidate() {
+    void testTransformCalciteValidate() {
         SqlSelect parse =
                 TransformParser.parseSelect(
                         "select SUBSTR(id, 1) as uniq_id, * from tb where id is not null");
@@ -101,19 +102,18 @@ public class TransformParserTest {
                         factory,
                         SqlValidator.Config.DEFAULT.withIdentifierExpansion(true));
         SqlNode validateSqlNode = validator.validate(parse);
-        Assert.assertEquals(
-                "SUBSTR(`tb`.`id`, 1) AS `uniq_id`, `tb`.`id`, `tb`.`order_id`",
-                parse.getSelectList().toString());
-        Assert.assertEquals("`tb`.`id` IS NOT NULL", parse.getWhere().toString());
-        Assert.assertEquals(
-                "SELECT SUBSTR(`tb`.`id`, 1) AS `uniq_id`, `tb`.`id`, `tb`.`order_id`\n"
-                        + "FROM `default_schema`.`tb` AS `tb`\n"
-                        + "WHERE `tb`.`id` IS NOT NULL",
-                validateSqlNode.toString().replaceAll("\r\n", "\n"));
+        assertThat(parse.getSelectList().toString())
+                .isEqualTo("SUBSTR(`tb`.`id`, 1) AS `uniq_id`, `tb`.`id`, `tb`.`order_id`");
+        assertThat(parse.getWhere().toString()).isEqualTo("`tb`.`id` IS NOT NULL");
+        assertThat(validateSqlNode.toString().replaceAll("\r\n", "\n"))
+                .isEqualTo(
+                        "SELECT SUBSTR(`tb`.`id`, 1) AS `uniq_id`, `tb`.`id`, `tb`.`order_id`\n"
+                                + "FROM `default_schema`.`tb` AS `tb`\n"
+                                + "WHERE `tb`.`id` IS NOT NULL");
     }
 
     @Test
-    public void testCalciteRelNode() {
+    void testCalciteRelNode() {
         SqlSelect parse =
                 TransformParser.parseSelect(
                         "select SUBSTR(id, 1) as uniq_id, * from tb where id is not null");
@@ -160,33 +160,32 @@ public class TransformParserTest {
         RelBuilder relBuilder = config.getRelBuilderFactory().create(cluster, null);
         relRoot = relRoot.withRel(RelDecorrelator.decorrelateQuery(relRoot.rel, relBuilder));
         RelNode relNode = relRoot.rel;
-        Assert.assertEquals(
-                "SUBSTR(`tb`.`id`, 1) AS `uniq_id`, `tb`.`id`, `tb`.`order_id`",
-                parse.getSelectList().toString());
-        Assert.assertEquals("`tb`.`id` IS NOT NULL", parse.getWhere().toString());
-        Assert.assertEquals(
-                "SELECT SUBSTR(`tb`.`id`, 1) AS `uniq_id`, `tb`.`id`, `tb`.`order_id`\n"
-                        + "FROM `default_schema`.`tb` AS `tb`\n"
-                        + "WHERE `tb`.`id` IS NOT NULL",
-                validateSqlNode.toString().replaceAll("\r\n", "\n"));
+        assertThat(parse.getSelectList().toString())
+                .isEqualTo("SUBSTR(`tb`.`id`, 1) AS `uniq_id`, `tb`.`id`, `tb`.`order_id`");
+        assertThat(parse.getWhere().toString()).isEqualTo("`tb`.`id` IS NOT NULL");
+        assertThat(validateSqlNode.toString().replaceAll("\r\n", "\n"))
+                .isEqualTo(
+                        "SELECT SUBSTR(`tb`.`id`, 1) AS `uniq_id`, `tb`.`id`, `tb`.`order_id`\n"
+                                + "FROM `default_schema`.`tb` AS `tb`\n"
+                                + "WHERE `tb`.`id` IS NOT NULL");
     }
 
     @Test
-    public void testParseComputedColumnNames() {
+    void testParseComputedColumnNames() {
         List<String> computedColumnNames =
                 TransformParser.parseComputedColumnNames("CONCAT(id, order_id) as uniq_id, *");
-        Assert.assertEquals(new String[] {"uniq_id"}, computedColumnNames.toArray());
+        assertThat(computedColumnNames.toArray()).isEqualTo(new String[] {"uniq_id"});
     }
 
     @Test
-    public void testParseFilterColumnNameList() {
+    void testParseFilterColumnNameList() {
         List<String> computedColumnNames =
                 TransformParser.parseFilterColumnNameList(" uniq_id > 10 and id is not null");
-        Assert.assertEquals(new String[] {"uniq_id", "id"}, computedColumnNames.toArray());
+        assertThat(computedColumnNames.toArray()).isEqualTo(new String[] {"uniq_id", "id"});
     }
 
     @Test
-    public void testTranslateFilterToJaninoExpression() {
+    void testTranslateFilterToJaninoExpression() {
         testFilterExpression("id is not null", "null != id");
         testFilterExpression("id is null", "null == id");
         testFilterExpression("id = 1 and uid = 2", "valueEquals(id, 1) && valueEquals(uid, 2)");
@@ -269,6 +268,6 @@ public class TransformParserTest {
     private void testFilterExpression(String expression, String expressionExpect) {
         String janinoExpression =
                 TransformParser.translateFilterExpressionToJaninoExpression(expression);
-        Assert.assertEquals(expressionExpect, janinoExpression);
+        assertThat(janinoExpression).isEqualTo(expressionExpect);
     }
 }

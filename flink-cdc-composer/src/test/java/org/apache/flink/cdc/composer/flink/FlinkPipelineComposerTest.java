@@ -27,8 +27,9 @@ import org.apache.flink.cdc.composer.utils.factory.DataSinkFactory1;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** A test for the {@link FlinkPipelineComposer}. */
 class FlinkPipelineComposerTest {
@@ -55,7 +56,7 @@ class FlinkPipelineComposerTest {
                                 new Configuration(),
                                 Thread.currentThread().getContextClassLoader()));
 
-        Assertions.assertTrue(dataSink instanceof DataSinkFactory1.TestDataSink);
-        Assertions.assertEquals("0.0.0.0", ((DataSinkFactory1.TestDataSink) dataSink).getHost());
+        assertThat(dataSink).isInstanceOf(DataSinkFactory1.TestDataSink.class);
+        assertThat(((DataSinkFactory1.TestDataSink) dataSink).getHost()).isEqualTo("0.0.0.0");
     }
 }

@@ -19,7 +19,7 @@ package org.apache.flink.cdc.migration.tests;
 
 import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import static org.apache.flink.cdc.migration.tests.MigrationTestBase.FlinkCdcVersion.v3_1_0;
 
@@ -28,7 +28,7 @@ public class SchemaRegistryMigrationTest extends MigrationTestBase {
     public static String mockCaseName = "SchemaRegistryMigrationMock";
 
     @Test
-    public void testMigration() throws Exception {
+    void testMigration() throws Exception {
         // It is known that 3.1.0 that breaks backwards compatibility.
         // No state compatibility is guaranteed.
         for (FlinkCdcVersion version : getAllVersionExcept(v3_1_0)) {
