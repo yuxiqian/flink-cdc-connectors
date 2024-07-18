@@ -35,6 +35,7 @@ import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.StringDebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.table.MetadataConverter;
 import org.apache.flink.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
+import org.apache.flink.configuration.RpcOptions;
 import org.apache.flink.core.execution.JobClient;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.Metric;
@@ -326,7 +327,8 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                         operator.getOperatorIdFuture(),
                         serializer,
                         accumulatorName,
-                        env.getCheckpointConfig());
+                        env.getCheckpointConfig(),
+                        RpcOptions.ASK_TIMEOUT_DURATION.defaultValue().toMillis());
         CollectStreamSink<RowData> sink = new CollectStreamSink(source, factory);
         sink.name("Data stream collect sink");
         env.addOperator(sink.getTransformation());
@@ -807,7 +809,8 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                         operator.getOperatorIdFuture(),
                         serializer,
                         accumulatorName,
-                        env.getCheckpointConfig());
+                        env.getCheckpointConfig(),
+                        RpcOptions.ASK_TIMEOUT_DURATION.defaultValue().toMillis());
         CollectStreamSink<T> sink = new CollectStreamSink<>(stream, factory);
         sink.name("Data stream collect sink");
         env.addOperator(sink.getTransformation());

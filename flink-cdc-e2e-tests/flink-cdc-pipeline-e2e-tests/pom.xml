@@ -30,9 +30,10 @@ limitations under the License.
     <properties>
         <flink-1.17>1.17.2</flink-1.17>
         <flink-1.18>1.18.1</flink-1.18>
-        <flink-1.19>1.19.0</flink-1.19>
+        <flink-1.19>1.19.1</flink-1.19>
         <mysql.driver.version>8.0.27</mysql.driver.version>
-        <starrocks.connector.version>1.2.9_flink-${flink.major.version}</starrocks.connector.version>
+        <!-- StarRocks does not support Flink 1.19 yet. -->
+        <starrocks.connector.version>1.2.9_flink-1.18</starrocks.connector.version>
     </properties>
 
     <dependencies>

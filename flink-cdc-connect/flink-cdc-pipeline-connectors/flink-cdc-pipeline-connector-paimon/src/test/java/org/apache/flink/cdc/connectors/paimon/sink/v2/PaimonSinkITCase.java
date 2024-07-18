@@ -17,7 +17,8 @@
 
 package org.apache.flink.cdc.connectors.paimon.sink.v2;
 
-import org.apache.flink.api.common.JobID;
+import org.apache.flink.api.common.JobInfo;
+import org.apache.flink.api.common.TaskInfo;
 import org.apache.flink.api.common.operators.MailboxExecutor;
 import org.apache.flink.api.common.operators.ProcessingTimeService;
 import org.apache.flink.api.common.serialization.SerializationSchema;
@@ -37,7 +38,14 @@ import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.connectors.paimon.sink.PaimonMetadataApplier;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
+import org.apache.flink.metrics.CharacterFilter;
+import org.apache.flink.metrics.Counter;
+import org.apache.flink.metrics.Gauge;
+import org.apache.flink.metrics.Histogram;
+import org.apache.flink.metrics.Meter;
 import org.apache.flink.metrics.MetricGroup;
+import org.apache.flink.metrics.groups.OperatorIOMetricGroup;
+import org.apache.flink.metrics.groups.SinkCommitterMetricGroup;
 import org.apache.flink.metrics.groups.SinkWriterMetricGroup;
 import org.apache.flink.streaming.runtime.operators.sink.committables.CommitRequestImpl;
 import org.apache.flink.table.api.EnvironmentSettings;
@@ -63,6 +71,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.UUID;
@@ -454,7 +463,99 @@ public class PaimonSinkITCase {
     private static class MockCommitRequestImpl<CommT> extends CommitRequestImpl<CommT> {
 
         protected MockCommitRequestImpl(CommT committable) {
-            super(committable);
+            super(
+                    committable,
+                    new SinkCommitterMetricGroup() {
+
+                        @Override
+                        public Counter counter(String s) {
+                            return null;
+                        }
+
+                        @Override
+                        public <C extends Counter> C counter(String s, C c) {
+                            return null;
+                        }
+
+                        @Override
+                        public <T, G extends Gauge<T>> G gauge(String s, G g) {
+                            return null;
+                        }
+
+                        @Override
+                        public <H extends Histogram> H histogram(String s, H h) {
+                            return null;
+                        }
+
+                        @Override
+                        public <M extends Meter> M meter(String s, M m) {
+                            return null;
+                        }
+
+                        @Override
+                        public MetricGroup addGroup(String s) {
+                            return null;
+                        }
+
+                        @Override
+                        public MetricGroup addGroup(String s, String s1) {
+                            return null;
+                        }
+
+                        @Override
+                        public String[] getScopeComponents() {
+                            return new String[0];
+                        }
+
+                        @Override
+                        public Map<String, String> getAllVariables() {
+                            return Collections.emptyMap();
+                        }
+
+                        @Override
+                        public String getMetricIdentifier(String s) {
+                            return "";
+                        }
+
+                        @Override
+                        public String getMetricIdentifier(
+                                String s, CharacterFilter characterFilter) {
+                            return "";
+                        }
+
+                        @Override
+                        public OperatorIOMetricGroup getIOMetricGroup() {
+                            return null;
+                        }
+
+                        @Override
+                        public Counter getNumCommittablesTotalCounter() {
+                            return null;
+                        }
+
+                        @Override
+                        public Counter getNumCommittablesFailureCounter() {
+                            return null;
+                        }
+
+                        @Override
+                        public Counter getNumCommittablesRetryCounter() {
+                            return null;
+                        }
+
+                        @Override
+                        public Counter getNumCommittablesSuccessCounter() {
+                            return null;
+                        }
+
+                        @Override
+                        public Counter getNumCommittablesAlreadyCommittedCounter() {
+                            return null;
+                        }
+
+                        @Override
+                        public void setCurrentPendingCommittablesGauge(Gauge<Integer> gauge) {}
+                    });
         }
     }
 
@@ -473,18 +574,6 @@ public class PaimonSinkITCase {
 
         public ProcessingTimeService getProcessingTimeService() {
             return null;
-        }
-
-        public int getSubtaskId() {
-            return 0;
-        }
-
-        public int getNumberOfParallelSubtasks() {
-            return 0;
-        }
-
-        public int getAttemptNumber() {
-            return 0;
         }
 
         public SinkWriterMetricGroup metricGroup() {
@@ -512,7 +601,13 @@ public class PaimonSinkITCase {
             return null;
         }
 
-        public JobID getJobId() {
+        @Override
+        public JobInfo getJobInfo() {
+            return null;
+        }
+
+        @Override
+        public TaskInfo getTaskInfo() {
             return null;
         }
     }

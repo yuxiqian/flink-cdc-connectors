@@ -27,6 +27,7 @@ import org.apache.flink.cdc.connectors.mysql.testutils.TestTable;
 import org.apache.flink.cdc.connectors.mysql.testutils.TestTableSchemas;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.RpcOptions;
 import org.apache.flink.core.execution.JobClient;
 import org.apache.flink.core.execution.SavepointFormatType;
 import org.apache.flink.runtime.jobgraph.SavepointConfigOptions;
@@ -468,7 +469,8 @@ public class SpecificStartingOffsetITCase {
                         operator.getOperatorIdFuture(),
                         serializer,
                         accumulatorName,
-                        env.getCheckpointConfig());
+                        env.getCheckpointConfig(),
+                        RpcOptions.ASK_TIMEOUT_DURATION.defaultValue().toMillis());
         CollectStreamSink<T> sink = new CollectStreamSink<>(stream, factory);
         sink.name("Data stream collect sink");
         env.addOperator(sink.getTransformation());

@@ -109,7 +109,7 @@ public class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
                     String.format("+I[%s, coll_a2, A202]", db1)
                 };
 
-        List<String> actual = TestValuesTableFactory.getResults("mongodb_sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("mongodb_sink");
         assertThat(actual, containsInAnyOrder(expected));
 
         result.getJobClient().get().cancel().get();
@@ -163,7 +163,7 @@ public class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
                     String.format("+I[%s, coll_b2, B202]", db1),
                 };
 
-        List<String> actual = TestValuesTableFactory.getResults("mongodb_sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("mongodb_sink");
         assertThat(actual, containsInAnyOrder(expected));
 
         result.getJobClient().get().cancel().get();
@@ -202,7 +202,7 @@ public class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
                     String.format("+I[%s, coll_b2, B202]", db0)
                 };
 
-        List<String> actual = TestValuesTableFactory.getResults("mongodb_sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("mongodb_sink");
         assertThat(actual, containsInAnyOrder(expected));
 
         result.getJobClient().get().cancel().get();
@@ -241,7 +241,7 @@ public class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
                     String.format("+I[%s, coll_b2, B202]", db0)
                 };
 
-        List<String> actual = TestValuesTableFactory.getResults("mongodb_sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("mongodb_sink");
         assertThat(actual, containsInAnyOrder(expected));
 
         result.getJobClient().get().cancel().get();
@@ -261,7 +261,7 @@ public class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
         // 3. Check results
         String[] expected = new String[] {String.format("+I[%s, coll-a1, A101]", db0)};
 
-        List<String> actual = TestValuesTableFactory.getResults("mongodb_sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("mongodb_sink");
         assertThat(actual, containsInAnyOrder(expected));
 
         result.getJobClient().get().cancel().get();
@@ -286,7 +286,7 @@ public class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
                     String.format("+I[%s, coll.name, A103]", db)
                 };
 
-        List<String> actual = TestValuesTableFactory.getResults("mongodb_sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("mongodb_sink");
         assertThat(actual, containsInAnyOrder(expected));
 
         result.getJobClient().get().cancel().get();
