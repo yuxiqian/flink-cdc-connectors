@@ -415,6 +415,7 @@ class YamlPipelineDefinitionParserTest {
                                     null,
                                     null,
                                     "add new uniq_id for each row")),
+                    Collections.emptyList(),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
                                     .put("name", "source-database-sync-pipe")
