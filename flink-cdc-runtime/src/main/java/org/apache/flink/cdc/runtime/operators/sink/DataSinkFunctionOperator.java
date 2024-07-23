@@ -34,6 +34,7 @@ import org.apache.flink.streaming.api.operators.StreamSink;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
 
+import java.io.Serializable;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
@@ -48,7 +49,9 @@ import java.util.Set;
  * <p>The operator is always part of a sink pipeline and is the first operator.
  */
 @Internal
-public class DataSinkFunctionOperator extends StreamSink<Event> {
+public class DataSinkFunctionOperator extends StreamSink<Event> implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     private SchemaEvolutionClient schemaEvolutionClient;
     private final OperatorID schemaOperatorID;

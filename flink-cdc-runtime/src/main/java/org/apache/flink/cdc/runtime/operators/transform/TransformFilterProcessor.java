@@ -70,7 +70,7 @@ public class TransformFilterProcessor {
 
     private Object[] generateParams(BinaryRecordData after, long epochTime) {
         List<Object> params = new ArrayList<>();
-        List<Column> columns = tableInfo.getInputSchema().getColumns();
+        List<Column> columns = tableInfo.getPreTransformedSchema().getColumns();
         RecordData.FieldGetter[] fieldGetters = tableInfo.getPreTransformedFieldGetters();
         for (String columnName : transformFilter.getColumnNames()) {
             if (columnName.equals(TransformParser.DEFAULT_NAMESPACE_NAME)) {
@@ -103,14 +103,16 @@ public class TransformFilterProcessor {
     private TransformExpressionKey generateTransformExpressionKey() {
         List<String> argumentNames = new ArrayList<>();
         List<Class<?>> paramTypes = new ArrayList<>();
-        List<Column> columns = tableInfo.getInputSchema().getColumns();
+        List<Column> columns = tableInfo.getPreTransformedSchema().getColumns();
         String scriptExpression = transformFilter.getScriptExpression();
         List<String> columnNames = transformFilter.getColumnNames();
         for (String columnName : columnNames) {
             for (Column column : columns) {
                 if (column.getName().equals(columnName)) {
-                    argumentNames.add(columnName);
-                    paramTypes.add(DataTypeConverter.convertOriginalClass(column.getType()));
+                    if (!argumentNames.contains(columnName)) {
+                        argumentNames.add(columnName);
+                        paramTypes.add(DataTypeConverter.convertOriginalClass(column.getType()));
+                    }
                     break;
                 }
             }
