@@ -124,8 +124,7 @@ public class TransformSchemaOperator extends AbstractStreamOperator<Event>
         if (context.isRestored()) {
             for (byte[] serializedTableInfo : state.get()) {
                 TableChangeInfo stateTableChangeInfo =
-                        TableChangeInfo.SERIALIZER.deserialize(
-                                TableChangeInfo.SERIALIZER.getVersion(), serializedTableInfo);
+                        TableChangeInfo.SERIALIZER.deserialize(serializedTableInfo);
                 tableChangeInfoMap.put(stateTableChangeInfo.getTableId(), stateTableChangeInfo);
             }
         }

@@ -34,6 +34,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 
 /** The TableInfo applies to cache schema change and fieldGetters. */
@@ -111,6 +112,20 @@ public class TableChangeInfo {
 
         public static final int CURRENT_VERSION = 1;
 
+        public static final byte[] MAGIC_HEADER = {0x4B, 0x4C, 0x4F, 0x4E, 0x47, 0x4C, 0x4F, 0x4E};
+
+        public static boolean hasMagicHeader(byte[] bytes) {
+            if (bytes.length < MAGIC_HEADER.length) {
+                return false;
+            }
+            for (int i = 0; i < MAGIC_HEADER.length; i++) {
+                if (bytes[i] != MAGIC_HEADER[i]) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         @Override
         public int getVersion() {
             return CURRENT_VERSION;
@@ -122,6 +137,8 @@ public class TableChangeInfo {
             SchemaSerializer schemaSerializer = SchemaSerializer.INSTANCE;
             try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
                     DataOutputStream out = new DataOutputStream(baos)) {
+                out.write(MAGIC_HEADER);
+                out.writeInt(CURRENT_VERSION);
                 tableIdSerializer.serialize(
                         tableChangeInfo.getTableId(), new DataOutputViewStreamWrapper(out));
                 schemaSerializer.serialize(
@@ -130,6 +147,24 @@ public class TableChangeInfo {
                         tableChangeInfo.transformedSchema, new DataOutputViewStreamWrapper(out));
                 return baos.toByteArray();
             }
+        }
+
+        public TableChangeInfo deserialize(byte[] serialized) throws IOException {
+            try (ByteArrayInputStream bais = new ByteArrayInputStream(serialized);
+                    DataInputStream in = new DataInputStream(bais)) {
+                byte[] headerBufferBytes = new byte[MAGIC_HEADER.length];
+                if (in.read(headerBufferBytes, 0, MAGIC_HEADER.length) == MAGIC_HEADER.length) {
+                    if (Arrays.equals(MAGIC_HEADER, headerBufferBytes)) {
+                        int version = in.readInt();
+                        return deserialize(
+                                version,
+                                Arrays.copyOfRange(
+                                        serialized, MAGIC_HEADER.length + 4, serialized.length));
+                    }
+                }
+            }
+            // This is a POD serializer format, fallback to common cases
+            return deserialize(0, serialized);
         }
 
         @Override
