@@ -115,7 +115,7 @@ public class TableChangeInfo {
         public static final int CURRENT_VERSION = 2;
 
         /** Used to distinguish with the state which CURRENT_VERSION was not written. */
-        public static final TableId magicTableId = TableId.tableId("__magic_table__");
+        public static final TableId MAGIC_TABLE_ID = TableId.tableId("__magic_table__");
 
         @Override
         public int getVersion() {
@@ -128,7 +128,7 @@ public class TableChangeInfo {
             SchemaSerializer schemaSerializer = SchemaSerializer.INSTANCE;
             try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
                     DataOutputStream out = new DataOutputStream(baos)) {
-                tableIdSerializer.serialize(magicTableId, new DataOutputViewStreamWrapper(out));
+                tableIdSerializer.serialize(MAGIC_TABLE_ID, new DataOutputViewStreamWrapper(out));
                 out.writeInt(CURRENT_VERSION);
                 tableIdSerializer.serialize(
                         tableChangeInfo.getTableId(), new DataOutputViewStreamWrapper(out));
@@ -147,7 +147,7 @@ public class TableChangeInfo {
             try (ByteArrayInputStream bais = new ByteArrayInputStream(serialized);
                     DataInputStream in = new DataInputStream(bais)) {
                 TableId tableId = tableIdSerializer.deserialize(new DataInputViewStreamWrapper(in));
-                if (tableId.equals(magicTableId)) {
+                if (tableId.equals(MAGIC_TABLE_ID)) {
                     version = in.readInt();
                     tableId = tableIdSerializer.deserialize(new DataInputViewStreamWrapper(in));
                 } else {
