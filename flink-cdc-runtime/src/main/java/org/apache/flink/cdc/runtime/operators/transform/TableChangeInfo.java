@@ -109,6 +109,9 @@ public class TableChangeInfo {
     /** Serializer for {@link TableChangeInfo}. */
     public static class Serializer implements SimpleVersionedSerializer<TableChangeInfo> {
 
+        /** The latest version before change of state compatibility. */
+        public static final int VERSION_BEFORE_STATE_COMPATIBILITY = 1;
+
         public static final int CURRENT_VERSION = 2;
 
         /** Used to distinguish with the state which CURRENT_VERSION was not written. */
@@ -147,6 +150,8 @@ public class TableChangeInfo {
                 if (tableId.equals(magicTableId)) {
                     version = in.readInt();
                     tableId = tableIdSerializer.deserialize(new DataInputViewStreamWrapper(in));
+                } else {
+                    version = VERSION_BEFORE_STATE_COMPATIBILITY;
                 }
                 Schema originalSchema =
                         schemaSerializer.deserialize(version, new DataInputViewStreamWrapper(in));
