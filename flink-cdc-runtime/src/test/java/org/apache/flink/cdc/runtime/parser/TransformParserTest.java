@@ -218,26 +218,23 @@ public class TransformParserTest {
         testFilterExpression("floor(2)", "floor(2)");
         testFilterExpression("round(2,2)", "round(2, 2)");
         testFilterExpression("uuid()", "uuid()");
+        testFilterExpression("id = LOCALTIME", "valueEquals(id, localtime(__epoch_time__))");
         testFilterExpression(
-                "id = LOCALTIME", "valueEquals(id, localtime(__epoch_time__, __time_zone__))");
+                "id = LOCALTIMESTAMP", "valueEquals(id, localtimestamp(__epoch_time__))");
+        testFilterExpression("id = CURRENT_TIME", "valueEquals(id, currentTime(__epoch_time__))");
+        testFilterExpression("id = CURRENT_DATE", "valueEquals(id, currentDate(__epoch_time__))");
         testFilterExpression(
-                "id = LOCALTIMESTAMP",
-                "valueEquals(id, localtimestamp(__epoch_time__, __time_zone__))");
-        testFilterExpression(
-                "id = CURRENT_TIME", "valueEquals(id, currentTime(__epoch_time__, __time_zone__))");
-        testFilterExpression(
-                "id = CURRENT_DATE", "valueEquals(id, currentDate(__epoch_time__, __time_zone__))");
-        testFilterExpression(
-                "id = CURRENT_TIMESTAMP",
-                "valueEquals(id, currentTimestamp(__epoch_time__, __time_zone__))");
-        testFilterExpression("NOW()", "now(__epoch_time__, __time_zone__)");
+                "id = CURRENT_TIMESTAMP", "valueEquals(id, currentTimestamp(__epoch_time__))");
+        testFilterExpression("NOW()", "now(__epoch_time__)");
         testFilterExpression("YEAR(dt)", "year(dt)");
         testFilterExpression("QUARTER(dt)", "quarter(dt)");
         testFilterExpression("MONTH(dt)", "month(dt)");
         testFilterExpression("WEEK(dt)", "week(dt)");
-        testFilterExpression("DATE_FORMAT(dt,'yyyy-MM-dd')", "dateFormat(dt, \"yyyy-MM-dd\")");
-        testFilterExpression("TO_DATE(dt, 'yyyy-MM-dd')", "toDate(dt, \"yyyy-MM-dd\")");
-        testFilterExpression("TO_TIMESTAMP(dt)", "toTimestamp(dt)");
+        testFilterExpression(
+                "DATE_FORMAT(dt,'yyyy-MM-dd')", "dateFormat(dt, \"yyyy-MM-dd\", __time_zone__)");
+        testFilterExpression(
+                "TO_DATE(dt, 'yyyy-MM-dd')", "toDate(dt, \"yyyy-MM-dd\", __time_zone__)");
+        testFilterExpression("TO_TIMESTAMP(dt)", "toTimestamp(dt, __time_zone__)");
         testFilterExpression("TIMESTAMP_DIFF('DAY', dt1, dt2)", "timestampDiff(\"DAY\", dt1, dt2)");
         testFilterExpression("IF(a>b,a,b)", "a > b ? a : b");
         testFilterExpression("NULLIF(a,b)", "nullif(a, b)");

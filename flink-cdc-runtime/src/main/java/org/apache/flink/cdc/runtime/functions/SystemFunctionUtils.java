@@ -42,62 +42,67 @@ import java.util.regex.Pattern;
 public class SystemFunctionUtils {
     private static final Logger LOG = LoggerFactory.getLogger(SystemFunctionUtils.class);
 
-    public static int localtime(long epochTime, String timezone) {
+    public static int localtime(long epochTime) {
         return DateTimeUtils.timestampMillisToTime(epochTime);
     }
 
-    public static TimestampData localtimestamp(long epochTime, String timezone) {
+    public static TimestampData localtimestamp(long epochTime) {
         return TimestampData.fromMillis(epochTime);
     }
 
     // synonym: localtime
-    public static int currentTime(long epochTime, String timezone) {
-        return localtime(epochTime, timezone);
+    public static int currentTime(long epochTime) {
+        return localtime(epochTime);
     }
 
-    public static int currentDate(long epochTime, String timezone) {
+    public static int currentDate(long epochTime) {
         return DateTimeUtils.timestampMillisToDate(epochTime);
     }
 
-    public static TimestampData currentTimestamp(long epochTime, String timezone) {
-        return TimestampData.fromMillis(
-                epochTime + TimeZone.getTimeZone(timezone).getOffset(epochTime));
+    public static TimestampData currentTimestamp(long epochTime) {
+        return TimestampData.fromMillis(epochTime);
     }
 
-    public static LocalZonedTimestampData now(long epochTime, String timezone) {
-        return LocalZonedTimestampData.fromEpochMillis(
-                epochTime + TimeZone.getTimeZone(timezone).getOffset(epochTime));
+    public static LocalZonedTimestampData now(long epochTime) {
+        return LocalZonedTimestampData.fromEpochMillis(epochTime);
     }
 
-    public static String dateFormat(LocalZonedTimestampData timestamp, String format) {
+    public static String dateFormat(long epochTime, String format, String timezone) {
         return DateTimeUtils.formatTimestampMillis(
-                timestamp.getEpochMillisecond(), format, TimeZone.getTimeZone("GMT"));
+                epochTime, format, TimeZone.getTimeZone(timezone));
     }
 
-    public static String dateFormat(TimestampData timestamp, String format) {
+    public static String dateFormat(
+            LocalZonedTimestampData timestamp, String format, String timezone) {
         return DateTimeUtils.formatTimestampMillis(
-                timestamp.getMillisecond(), format, TimeZone.getTimeZone("GMT"));
+                timestamp.getEpochMillisecond(), format, TimeZone.getTimeZone(timezone));
     }
 
-    public static String dateFormat(ZonedTimestampData timestamp, String format) {
+    public static String dateFormat(TimestampData timestamp, String format, String timezone) {
         return DateTimeUtils.formatTimestampMillis(
-                timestamp.getMillisecond(), format, TimeZone.getTimeZone("GMT"));
+                timestamp.getMillisecond(), format, TimeZone.getTimeZone(timezone));
     }
 
-    public static int toDate(String str) {
-        return toDate(str, "yyyy-MM-dd");
+    public static String dateFormat(ZonedTimestampData timestamp, String format, String timezone) {
+        return DateTimeUtils.formatTimestampMillis(
+                timestamp.getMillisecond(), format, TimeZone.getTimeZone(timezone));
     }
 
-    public static int toDate(String str, String format) {
-        return DateTimeUtils.parseDate(str, format);
+    public static int toDate(String str, String timezone) {
+        return toDate(str, "yyyy-MM-dd", timezone);
     }
 
-    public static TimestampData toTimestamp(String str) {
-        return toTimestamp(str, "yyyy-MM-dd HH:mm:ss");
+    public static int toDate(String str, String format, String timezone) {
+        return DateTimeUtils.parseDate(str, format, timezone);
     }
 
-    public static TimestampData toTimestamp(String str, String format) {
+    public static TimestampData toTimestamp(String str, String timezone) {
+        return toTimestamp(str, "yyyy-MM-dd HH:mm:ss", timezone);
+    }
+
+    public static TimestampData toTimestamp(String str, String format, String timezone) {
         SimpleDateFormat dateFormat = new SimpleDateFormat(format);
+        dateFormat.setTimeZone(TimeZone.getTimeZone(timezone));
         try {
             return TimestampData.fromMillis(dateFormat.parse(str).getTime());
         } catch (ParseException e) {
@@ -133,6 +138,28 @@ public class SystemFunctionUtils {
 
     public static int timestampDiff(
             String symbol, ZonedTimestampData fromTimestamp, ZonedTimestampData toTimestamp) {
+        return timestampDiff(symbol, fromTimestamp.getMillisecond(), toTimestamp.getMillisecond());
+    }
+
+    public static int timestampDiff(
+            String symbol, LocalZonedTimestampData fromTimestamp, ZonedTimestampData toTimestamp) {
+        return timestampDiff(
+                symbol, fromTimestamp.getEpochMillisecond(), toTimestamp.getMillisecond());
+    }
+
+    public static int timestampDiff(
+            String symbol, ZonedTimestampData fromTimestamp, LocalZonedTimestampData toTimestamp) {
+        return timestampDiff(
+                symbol, fromTimestamp.getMillisecond(), toTimestamp.getEpochMillisecond());
+    }
+
+    public static int timestampDiff(
+            String symbol, TimestampData fromTimestamp, ZonedTimestampData toTimestamp) {
+        return timestampDiff(symbol, fromTimestamp.getMillisecond(), toTimestamp.getMillisecond());
+    }
+
+    public static int timestampDiff(
+            String symbol, ZonedTimestampData fromTimestamp, TimestampData toTimestamp) {
         return timestampDiff(symbol, fromTimestamp.getMillisecond(), toTimestamp.getMillisecond());
     }
 

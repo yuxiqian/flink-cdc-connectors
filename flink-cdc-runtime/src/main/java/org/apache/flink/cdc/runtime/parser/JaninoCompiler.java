@@ -57,6 +57,10 @@ public class JaninoCompiler {
                     "CURRENT_DATE",
                     "CURRENT_TIMESTAMP",
                     "NOW");
+
+    private static final List<String> TIMEZONE_TIMESTAMP_FUNCTIONS =
+            Arrays.asList("DATE_FORMAT", "TO_DATE", "TO_TIMESTAMP");
+
     public static final String DEFAULT_EPOCH_TIME = "__epoch_time__";
     public static final String DEFAULT_TIME_ZONE = "__time_zone__";
 
@@ -110,6 +114,8 @@ public class JaninoCompiler {
         String columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
         if (NO_OPERAND_TIMESTAMP_FUNCTIONS.contains(columnName)) {
             return generateNoOperandTimestampFunctionOperation(columnName);
+        } else if (TIMEZONE_TIMESTAMP_FUNCTIONS.contains(columnName)) {
+            return generateTimezoneTimestampFunctionOperation(columnName);
         } else {
             return new Java.AmbiguousName(Location.NOWHERE, new String[] {columnName});
         }
@@ -138,6 +144,8 @@ public class JaninoCompiler {
         }
         if (NO_OPERAND_TIMESTAMP_FUNCTIONS.contains(sqlBasicCall.getOperator().getName())) {
             atoms.add(new Java.AmbiguousName(Location.NOWHERE, new String[] {DEFAULT_EPOCH_TIME}));
+        }
+        if (TIMEZONE_TIMESTAMP_FUNCTIONS.contains(sqlBasicCall.getOperator().getName())) {
             atoms.add(new Java.AmbiguousName(Location.NOWHERE, new String[] {DEFAULT_TIME_ZONE}));
         }
         return sqlBasicCallToJaninoRvalue(sqlBasicCall, atoms.toArray(new Java.Rvalue[0]));
@@ -303,6 +311,15 @@ public class JaninoCompiler {
         List<Java.Rvalue> timestampFunctionParam = new ArrayList<>();
         timestampFunctionParam.add(
                 new Java.AmbiguousName(Location.NOWHERE, new String[] {DEFAULT_EPOCH_TIME}));
+        return new Java.MethodInvocation(
+                Location.NOWHERE,
+                null,
+                StringUtils.convertToCamelCase(operationName),
+                timestampFunctionParam.toArray(new Java.Rvalue[0]));
+    }
+
+    private static Java.Rvalue generateTimezoneTimestampFunctionOperation(String operationName) {
+        List<Java.Rvalue> timestampFunctionParam = new ArrayList<>();
         timestampFunctionParam.add(
                 new Java.AmbiguousName(Location.NOWHERE, new String[] {DEFAULT_TIME_ZONE}));
         return new Java.MethodInvocation(

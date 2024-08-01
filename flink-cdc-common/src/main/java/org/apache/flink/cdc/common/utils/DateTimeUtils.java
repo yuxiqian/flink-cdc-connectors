@@ -92,6 +92,14 @@ public class DateTimeUtils {
         return ymdToUnixDate(zdt.getYear(), zdt.getMonthValue(), zdt.getDayOfMonth());
     }
 
+    public static int parseDate(String dateStr, String fromFormat, String timezone) {
+        long ts = internalParseTimestampMillis(dateStr, fromFormat, TimeZone.getTimeZone(timezone));
+        ZoneId zoneId = ZoneId.of(timezone);
+        Instant instant = Instant.ofEpochMilli(ts);
+        ZonedDateTime zdt = ZonedDateTime.ofInstant(instant, zoneId);
+        return ymdToUnixDate(zdt.getYear(), zdt.getMonthValue(), zdt.getDayOfMonth());
+    }
+
     private static long internalParseTimestampMillis(String dateStr, String format, TimeZone tz) {
         SimpleDateFormat formatter = FORMATTER_CACHE.get(format);
         formatter.setTimeZone(tz);
