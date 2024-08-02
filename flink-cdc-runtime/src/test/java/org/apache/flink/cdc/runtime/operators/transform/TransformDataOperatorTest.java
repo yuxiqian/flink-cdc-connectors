@@ -150,6 +150,15 @@ public class TransformDataOperatorTest {
                     .primaryKey("col1")
                     .build();
 
+    private static final TableId TIMEZONE_TABLEID =
+            TableId.tableId("my_company", "my_branch", "timezone_table");
+    private static final Schema TIMEZONE_SCHEMA =
+            Schema.newBuilder()
+                    .physicalColumn("col1", DataTypes.STRING())
+                    .physicalColumn("datetime", DataTypes.STRING())
+                    .primaryKey("col1")
+                    .build();
+
     private static final TableId CONDITION_TABLEID =
             TableId.tableId("my_company", "my_branch", "condition_table");
     private static final Schema CONDITION_SCHEMA =
@@ -503,7 +512,7 @@ public class TransformDataOperatorTest {
                                         + " IF(DATE_FORMAT(CURRENT_TIMESTAMP, 'yyyy-MM-dd HH:mm:ss') = DATE_FORMAT(NOW(), 'yyyy-MM-dd HH:mm:ss'), 1, 0) as timestamp_equal,"
                                         + " IF(TO_DATE(DATE_FORMAT(LOCALTIMESTAMP, 'yyyy-MM-dd')) = CURRENT_DATE, 1, 0) as date_equal",
                                 "LOCALTIMESTAMP = CURRENT_TIMESTAMP")
-                        .addTimezone("GMT")
+                        .addTimezone("UTC")
                         .build();
         EventOperatorTestHarness<TransformDataOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
@@ -536,22 +545,6 @@ public class TransformDataOperatorTest {
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(insertEventExpect));
-
-        DataChangeEvent insertEvent2 =
-                DataChangeEvent.insertEvent(
-                        TIMESTAMPDIFF_TABLEID,
-                        recordDataGenerator.generate(
-                                new Object[] {new BinaryStringData("2"), null, null, null, null}));
-        DataChangeEvent insertEventExpect2 =
-                DataChangeEvent.insertEvent(
-                        TIMESTAMPDIFF_TABLEID,
-                        recordDataGenerator.generate(
-                                new Object[] {new BinaryStringData("2"), -28800, -480, -8, 0}));
-
-        transform.processElement(new StreamRecord<>(insertEvent2));
-        Assertions.assertThat(
-                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
-                .isEqualTo(new StreamRecord<>(insertEventExpect2));
     }
 
     @Test
@@ -572,7 +565,7 @@ public class TransformDataOperatorTest {
                                         + " TIMESTAMP_DIFF('HOUR', LOCALTIMESTAMP, NOW()) as hour_diff,"
                                         + " TIMESTAMP_DIFF('DAY', LOCALTIMESTAMP, NOW()) as day_diff",
                                 "col1='2'")
-                        .addTimezone("GMT-8:00")
+                        .addTimezone("Asia/Shanghai")
                         .build();
         EventOperatorTestHarness<TransformDataOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
@@ -594,13 +587,74 @@ public class TransformDataOperatorTest {
                 DataChangeEvent.insertEvent(
                         TIMESTAMPDIFF_TABLEID,
                         recordDataGenerator.generate(
-                                new Object[] {new BinaryStringData("1"), -28800, -480, -8, 0}));
+                                new Object[] {new BinaryStringData("1"), 0, 0, 0, 0}));
         transform.processElement(new StreamRecord<>(createTableEvent));
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(
                         new StreamRecord<>(
                                 new CreateTableEvent(TIMESTAMPDIFF_TABLEID, TIMESTAMPDIFF_SCHEMA)));
+        transform.processElement(new StreamRecord<>(insertEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(insertEventExpect));
+
+        DataChangeEvent insertEvent2 =
+                DataChangeEvent.insertEvent(
+                        TIMESTAMPDIFF_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {new BinaryStringData("2"), null, null, null, null}));
+        DataChangeEvent insertEventExpect2 =
+                DataChangeEvent.insertEvent(
+                        TIMESTAMPDIFF_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {new BinaryStringData("2"), 0, 0, 0, 0}));
+
+        transform.processElement(new StreamRecord<>(insertEvent2));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(insertEventExpect2));
+    }
+
+    @Test
+    void testTimezoneTransform() throws Exception {
+        TransformDataOperator transform =
+                TransformDataOperator.newBuilder()
+                        .addTransform(
+                                TIMEZONE_TABLEID.identifier(),
+                                "col1, DATE_FORMAT(TO_TIMESTAMP('2024-08-01 00:00:00'), 'yyyy-MM-dd HH:mm:ss') as datetime",
+                                null)
+                        .addTimezone("UTC")
+                        .build();
+        EventOperatorTestHarness<TransformDataOperator, Event>
+                transformFunctionEventEventOperatorTestHarness =
+                        new EventOperatorTestHarness<>(transform, 1);
+        // Initialization
+        transformFunctionEventEventOperatorTestHarness.open();
+        // Create table
+        CreateTableEvent createTableEvent = new CreateTableEvent(TIMEZONE_TABLEID, TIMEZONE_SCHEMA);
+        BinaryRecordDataGenerator recordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) TIMEZONE_SCHEMA.toRowDataType()));
+        // Insert
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        TIMEZONE_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {new BinaryStringData("1"), null}));
+        DataChangeEvent insertEventExpect =
+                DataChangeEvent.insertEvent(
+                        TIMEZONE_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("1"),
+                                    new BinaryStringData("2024-08-01 00:00:00")
+                                }));
+        transform.processElement(new StreamRecord<>(createTableEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new CreateTableEvent(TIMEZONE_TABLEID, TIMEZONE_SCHEMA)));
         transform.processElement(new StreamRecord<>(insertEvent));
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
@@ -1279,7 +1333,7 @@ public class TransformDataOperatorTest {
                                 CONDITION_TABLEID.identifier(),
                                 "col1, IF(" + expression + ", true, false) as condition_result",
                                 expression)
-                        .addTimezone("GMT")
+                        .addTimezone("UTC")
                         .build();
         EventOperatorTestHarness<TransformDataOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
