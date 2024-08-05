@@ -65,7 +65,7 @@ public class StarRocksSinkTestBase extends TestLogger {
     public static final int DEFAULT_STARTUP_TIMEOUT_SECONDS = 240;
 
     private static StarRocksContainer createStarRocksContainer() {
-        return new StarRocksContainer();
+        return (new StarRocksContainer()).withEnv("je.freeDisk", "0");
     }
 
     @Rule
