@@ -36,7 +36,9 @@ import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Container;
 import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy;
 import org.testcontainers.lifecycle.Startables;
+import org.testcontainers.shaded.org.apache.commons.io.IOUtils;
 
+import java.nio.charset.StandardCharsets;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
@@ -78,32 +80,45 @@ public class StarRocksSinkTestBase extends TestLogger {
 
     @BeforeClass
     public static void startContainers() {
-        LOG.info("Starting containers...");
-        Startables.deepStart(Stream.of(STARROCKS_CONTAINER)).join();
-        LOG.info("Waiting for StarRocks to launch");
+        try {
+            LOG.info("Starting containers...");
+            Startables.deepStart(Stream.of(STARROCKS_CONTAINER)).join();
+            LOG.info("Waiting for StarRocks to launch");
 
-        long startWaitingTimestamp = System.currentTimeMillis();
+            long startWaitingTimestamp = System.currentTimeMillis();
 
-        new LogMessageWaitStrategy()
-                .withRegEx(".*Enjoy the journal to StarRocks blazing-fast lake-house engine!.*\\s")
-                .withTimes(1)
-                .withStartupTimeout(
-                        Duration.of(DEFAULT_STARTUP_TIMEOUT_SECONDS, ChronoUnit.SECONDS))
-                .waitUntilReady(STARROCKS_CONTAINER);
+            new LogMessageWaitStrategy()
+                    .withRegEx(
+                            ".*Enjoy the journal to StarRocks blazing-fast lake-house engine!.*\\s")
+                    .withTimes(1)
+                    .withStartupTimeout(
+                            Duration.of(DEFAULT_STARTUP_TIMEOUT_SECONDS, ChronoUnit.SECONDS))
+                    .waitUntilReady(STARROCKS_CONTAINER);
 
-        while (!checkBackendAvailability()) {
-            try {
-                if (System.currentTimeMillis() - startWaitingTimestamp
-                        > DEFAULT_STARTUP_TIMEOUT_SECONDS * 1000) {
-                    throw new RuntimeException("StarRocks backend startup timed out.");
+            while (!checkBackendAvailability()) {
+                try {
+                    if (System.currentTimeMillis() - startWaitingTimestamp
+                            > DEFAULT_STARTUP_TIMEOUT_SECONDS * 1000) {
+                        throw new RuntimeException("StarRocks backend startup timed out.");
+                    }
+                    LOG.info("Waiting for backends to be available");
+                    Thread.sleep(1000);
+                } catch (InterruptedException ignored) {
+                    // ignore and check next round
                 }
-                LOG.info("Waiting for backends to be available");
-                Thread.sleep(1000);
-            } catch (InterruptedException ignored) {
-                // ignore and check next round
             }
+            LOG.info("Containers are started.");
+        } catch (Throwable t) {
+            STARROCKS_CONTAINER.copyFileFromContainer(
+                    "/data/deploy/starrocks/fe/log/fe.log",
+                    inputStream -> {
+                        System.out.println("[[[ FE ]]] FE Logs captured:");
+                        System.out.println(IOUtils.toString(inputStream, StandardCharsets.UTF_8));
+                        return null;
+                    });
+            System.out.println("See this!");
+            throw t;
         }
-        LOG.info("Containers are started.");
     }
 
     @AfterClass
