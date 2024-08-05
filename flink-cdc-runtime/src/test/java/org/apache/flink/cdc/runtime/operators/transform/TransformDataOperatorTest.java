@@ -509,9 +509,9 @@ public class TransformDataOperatorTest {
                         .addTransform(
                                 TIMESTAMP_TABLEID.identifier(),
                                 "col1, IF(LOCALTIME = CURRENT_TIME, 1, 0) as time_equal,"
-                                        + " IF(DATE_FORMAT(CURRENT_TIMESTAMP, 'yyyy-MM-dd HH:mm:ss') = DATE_FORMAT(NOW(), 'yyyy-MM-dd HH:mm:ss'), 1, 0) as timestamp_equal,"
+                                        + " IF(DATE_FORMAT(CAST(CURRENT_TIMESTAMP AS TIMESTAMP), 'yyyy-MM-dd HH:mm:ss') = DATE_FORMAT(CAST(NOW() AS TIMESTAMP), 'yyyy-MM-dd HH:mm:ss'), 1, 0) as timestamp_equal,"
                                         + " IF(TO_DATE(DATE_FORMAT(LOCALTIMESTAMP, 'yyyy-MM-dd')) = CURRENT_DATE, 1, 0) as date_equal",
-                                "LOCALTIMESTAMP = CURRENT_TIMESTAMP")
+                                "LOCALTIMESTAMP = CAST(CURRENT_TIMESTAMP AS TIMESTAMP)")
                         .addTimezone("UTC")
                         .build();
         EventOperatorTestHarness<TransformDataOperator, Event>
@@ -553,17 +553,17 @@ public class TransformDataOperatorTest {
                 TransformDataOperator.newBuilder()
                         .addTransform(
                                 TIMESTAMPDIFF_TABLEID.identifier(),
-                                "col1, TIMESTAMP_DIFF('SECOND', LOCALTIMESTAMP, CURRENT_TIMESTAMP) as second_diff,"
-                                        + " TIMESTAMP_DIFF('MINUTE', LOCALTIMESTAMP, CURRENT_TIMESTAMP) as minute_diff,"
-                                        + " TIMESTAMP_DIFF('HOUR', LOCALTIMESTAMP, CURRENT_TIMESTAMP) as hour_diff,"
-                                        + " TIMESTAMP_DIFF('DAY', LOCALTIMESTAMP, CURRENT_TIMESTAMP) as day_diff",
+                                "col1, TIMESTAMP_DIFF('SECOND', LOCALTIMESTAMP, CAST(CURRENT_TIMESTAMP AS TIMESTAMP)) as second_diff,"
+                                        + " TIMESTAMP_DIFF('MINUTE', LOCALTIMESTAMP, CAST(CURRENT_TIMESTAMP AS TIMESTAMP)) as minute_diff,"
+                                        + " TIMESTAMP_DIFF('HOUR', LOCALTIMESTAMP, CAST(CURRENT_TIMESTAMP AS TIMESTAMP)) as hour_diff,"
+                                        + " TIMESTAMP_DIFF('DAY', LOCALTIMESTAMP, CAST(CURRENT_TIMESTAMP AS TIMESTAMP)) as day_diff",
                                 "col1='1'")
                         .addTransform(
                                 TIMESTAMPDIFF_TABLEID.identifier(),
-                                "col1, TIMESTAMP_DIFF('SECOND', LOCALTIMESTAMP, NOW()) as second_diff,"
-                                        + " TIMESTAMP_DIFF('MINUTE', LOCALTIMESTAMP, NOW()) as minute_diff,"
-                                        + " TIMESTAMP_DIFF('HOUR', LOCALTIMESTAMP, NOW()) as hour_diff,"
-                                        + " TIMESTAMP_DIFF('DAY', LOCALTIMESTAMP, NOW()) as day_diff",
+                                "col1, TIMESTAMP_DIFF('SECOND', LOCALTIMESTAMP, CAST(NOW() AS TIMESTAMP)) as second_diff,"
+                                        + " TIMESTAMP_DIFF('MINUTE', LOCALTIMESTAMP, CAST(NOW() AS TIMESTAMP)) as minute_diff,"
+                                        + " TIMESTAMP_DIFF('HOUR', LOCALTIMESTAMP, CAST(NOW() AS TIMESTAMP)) as hour_diff,"
+                                        + " TIMESTAMP_DIFF('DAY', LOCALTIMESTAMP, CAST(NOW() AS TIMESTAMP)) as day_diff",
                                 "col1='2'")
                         .addTimezone("Asia/Shanghai")
                         .build();

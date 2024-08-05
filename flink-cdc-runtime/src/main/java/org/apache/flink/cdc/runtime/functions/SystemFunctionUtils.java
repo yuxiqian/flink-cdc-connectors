@@ -30,6 +30,9 @@ import java.math.MathContext;
 import java.math.RoundingMode;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
@@ -38,54 +41,45 @@ import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static org.apache.flink.cdc.common.utils.DateTimeUtils.timestampMillisToDate;
+import static org.apache.flink.cdc.common.utils.DateTimeUtils.timestampMillisToTime;
+
 /** System function utils to support the call of flink cdc pipeline transform. */
 public class SystemFunctionUtils {
+
     private static final Logger LOG = LoggerFactory.getLogger(SystemFunctionUtils.class);
 
-    public static int localtime(long epochTime) {
-        return DateTimeUtils.timestampMillisToTime(epochTime);
+    public static LocalZonedTimestampData currentTimestamp(long epochTime) {
+        return LocalZonedTimestampData.fromEpochMillis(epochTime);
     }
 
-    public static TimestampData localtimestamp(long epochTime) {
-        return TimestampData.fromMillis(epochTime);
-    }
-
-    // synonym: localtime
-    public static int currentTime(long epochTime) {
-        return localtime(epochTime);
-    }
-
-    public static int currentDate(long epochTime) {
-        return DateTimeUtils.timestampMillisToDate(epochTime);
-    }
-
-    public static TimestampData currentTimestamp(long epochTime) {
-        return TimestampData.fromMillis(epochTime);
-    }
-
+    // synonym with currentTimestamp
     public static LocalZonedTimestampData now(long epochTime) {
         return LocalZonedTimestampData.fromEpochMillis(epochTime);
     }
 
-    public static String dateFormat(long epochTime, String format, String timezone) {
-        return DateTimeUtils.formatTimestampMillis(
-                epochTime, format, TimeZone.getTimeZone(timezone));
+    public static TimestampData localtimestamp(long epochTime, String timezone) {
+        return TimestampData.fromLocalDateTime(
+                Instant.ofEpochMilli(epochTime).atZone(ZoneId.of(timezone)).toLocalDateTime());
     }
 
-    public static String dateFormat(
-            LocalZonedTimestampData timestamp, String format, String timezone) {
-        return DateTimeUtils.formatTimestampMillis(
-                timestamp.getEpochMillisecond(), format, TimeZone.getTimeZone(timezone));
+    public static int localtime(long epochTime, String timezone) {
+        return timestampMillisToTime(localtimestamp(epochTime, timezone).getMillisecond());
     }
 
-    public static String dateFormat(TimestampData timestamp, String format, String timezone) {
-        return DateTimeUtils.formatTimestampMillis(
-                timestamp.getMillisecond(), format, TimeZone.getTimeZone(timezone));
+    public static int currentTime(long epochTime, String timezone) {
+        // the time value of currentTimestamp under given session time zone
+        return timestampMillisToTime(localtimestamp(epochTime, timezone).getMillisecond());
     }
 
-    public static String dateFormat(ZonedTimestampData timestamp, String format, String timezone) {
+    public static int currentDate(long epochTime, String timezone) {
+        // the date value of currentTimestamp under given session time zone
+        return timestampMillisToDate(localtimestamp(epochTime, timezone).getMillisecond());
+    }
+
+    public static String dateFormat(TimestampData timestamp, String format) {
         return DateTimeUtils.formatTimestampMillis(
-                timestamp.getMillisecond(), format, TimeZone.getTimeZone(timezone));
+                timestamp.getMillisecond(), format, TimeZone.getTimeZone("UTC"));
     }
 
     public static int toDate(String str, String timezone) {
@@ -625,6 +619,24 @@ public class SystemFunctionUtils {
                 new BigDecimal(castObjectIntoString(object), new MathContext(precision));
         bigDecimal = bigDecimal.setScale(scale, BigDecimal.ROUND_HALF_UP);
         return bigDecimal;
+    }
+
+    public static TimestampData castToTimestamp(Object object, String timezone) {
+        if (object == null) {
+            return null;
+        }
+        if (object instanceof LocalZonedTimestampData) {
+            return TimestampData.fromLocalDateTime(
+                    LocalDateTime.ofInstant(
+                            ((LocalZonedTimestampData) object).toInstant(), ZoneId.of(timezone)));
+        } else if (object instanceof ZonedTimestampData) {
+            return TimestampData.fromLocalDateTime(
+                    LocalDateTime.ofInstant(
+                            ((ZonedTimestampData) object).toInstant(), ZoneId.of(timezone)));
+        } else {
+            return TimestampData.fromLocalDateTime(
+                    LocalDateTime.parse(castObjectIntoString(object)));
+        }
     }
 
     private static String castObjectIntoString(Object object) {

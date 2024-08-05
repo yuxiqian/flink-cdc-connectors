@@ -218,11 +218,15 @@ public class TransformParserTest {
         testFilterExpression("floor(2)", "floor(2)");
         testFilterExpression("round(2,2)", "round(2, 2)");
         testFilterExpression("uuid()", "uuid()");
-        testFilterExpression("id = LOCALTIME", "valueEquals(id, localtime(__epoch_time__))");
         testFilterExpression(
-                "id = LOCALTIMESTAMP", "valueEquals(id, localtimestamp(__epoch_time__))");
-        testFilterExpression("id = CURRENT_TIME", "valueEquals(id, currentTime(__epoch_time__))");
-        testFilterExpression("id = CURRENT_DATE", "valueEquals(id, currentDate(__epoch_time__))");
+                "id = LOCALTIME", "valueEquals(id, localtime(__epoch_time__, __time_zone__))");
+        testFilterExpression(
+                "id = LOCALTIMESTAMP",
+                "valueEquals(id, localtimestamp(__epoch_time__, __time_zone__))");
+        testFilterExpression(
+                "id = CURRENT_TIME", "valueEquals(id, currentTime(__epoch_time__, __time_zone__))");
+        testFilterExpression(
+                "id = CURRENT_DATE", "valueEquals(id, currentDate(__epoch_time__, __time_zone__))");
         testFilterExpression(
                 "id = CURRENT_TIMESTAMP", "valueEquals(id, currentTimestamp(__epoch_time__))");
         testFilterExpression("NOW()", "now(__epoch_time__)");
