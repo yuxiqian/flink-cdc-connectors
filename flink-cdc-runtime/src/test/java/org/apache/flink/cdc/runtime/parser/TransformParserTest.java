@@ -293,8 +293,9 @@ public class TransformParserTest {
         testFilterExpression("cast(null as char)", "castToString(null)");
         testFilterExpression("cast(null as varchar)", "castToString(null)");
         testFilterExpression(
-                "cast(CURRENT_TIMESTAMP as TIMESTAMP)", "castToTimestamp(__time_zone__)");
-        testFilterExpression("cast(dt as TIMESTAMP)", "castToTimestamp(__time_zone__)");
+                "cast(CURRENT_TIMESTAMP as TIMESTAMP)",
+                "castToTimestamp(currentTimestamp(__epoch_time__), __time_zone__)");
+        testFilterExpression("cast(dt as TIMESTAMP)", "castToTimestamp(dt, __time_zone__)");
     }
 
     private void testFilterExpression(String expression, String expressionExpect) {
