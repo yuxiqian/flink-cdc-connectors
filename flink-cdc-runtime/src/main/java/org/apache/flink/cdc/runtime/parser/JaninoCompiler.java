@@ -406,14 +406,14 @@ public class JaninoCompiler {
             case "STRING":
                 return new Java.MethodInvocation(Location.NOWHERE, null, "castToString", atoms);
             case "TIMESTAMP":
+                List<Java.Rvalue> timestampAtoms = new ArrayList<>(Arrays.asList(atoms));
+                timestampAtoms.add(
+                        new Java.AmbiguousName(Location.NOWHERE, new String[] {DEFAULT_TIME_ZONE}));
                 return new Java.MethodInvocation(
                         Location.NOWHERE,
                         null,
                         "castToTimestamp",
-                        new Java.Rvalue[] {
-                            new Java.AmbiguousName(
-                                    Location.NOWHERE, new String[] {DEFAULT_TIME_ZONE})
-                        });
+                        timestampAtoms.toArray(new Java.Rvalue[0]));
             default:
                 throw new ParseException(
                         "Unsupported data type cast: " + sqlDataTypeSpec.toString());
