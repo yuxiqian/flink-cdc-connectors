@@ -316,14 +316,13 @@ public class JaninoCompiler {
     }
 
     private static Java.Rvalue generateTimezoneFreeTemporalFunctionOperation(String operationName) {
-        List<Java.Rvalue> timestampFunctionParam = new ArrayList<>();
-        timestampFunctionParam.add(
-                new Java.AmbiguousName(Location.NOWHERE, new String[] {DEFAULT_EPOCH_TIME}));
         return new Java.MethodInvocation(
                 Location.NOWHERE,
                 null,
                 StringUtils.convertToCamelCase(operationName),
-                timestampFunctionParam.toArray(new Java.Rvalue[0]));
+                new Java.Rvalue[] {
+                    new Java.AmbiguousName(Location.NOWHERE, new String[] {DEFAULT_EPOCH_TIME})
+                });
     }
 
     private static Java.Rvalue generateTimezoneRequiredTemporalFunctionOperation(
@@ -346,19 +345,18 @@ public class JaninoCompiler {
                 Location.NOWHERE,
                 null,
                 StringUtils.convertToCamelCase(operationName),
-                new ArrayList<>().toArray(new Java.Rvalue[0]));
+                new Java.Rvalue[0]);
     }
 
     private static Java.Rvalue generateTimezoneRequiredTemporalConversionFunctionOperation(
             String operationName) {
-        List<Java.Rvalue> timestampFunctionParam = new ArrayList<>();
-        timestampFunctionParam.add(
-                new Java.AmbiguousName(Location.NOWHERE, new String[] {DEFAULT_TIME_ZONE}));
         return new Java.MethodInvocation(
                 Location.NOWHERE,
                 null,
                 StringUtils.convertToCamelCase(operationName),
-                timestampFunctionParam.toArray(new Java.Rvalue[0]));
+                new Java.Rvalue[] {
+                    new Java.AmbiguousName(Location.NOWHERE, new String[] {DEFAULT_TIME_ZONE})
+                });
     }
 
     private static Java.Rvalue generateTypeConvertMethod(
@@ -408,14 +406,14 @@ public class JaninoCompiler {
             case "STRING":
                 return new Java.MethodInvocation(Location.NOWHERE, null, "castToString", atoms);
             case "TIMESTAMP":
-                List<Java.Rvalue> timestampFunctionParam = new ArrayList<>(Arrays.asList(atoms));
-                timestampFunctionParam.add(
-                        new Java.AmbiguousName(Location.NOWHERE, new String[] {DEFAULT_TIME_ZONE}));
                 return new Java.MethodInvocation(
                         Location.NOWHERE,
                         null,
                         "castToTimestamp",
-                        timestampFunctionParam.toArray(new Java.Rvalue[0]));
+                        new Java.Rvalue[] {
+                            new Java.AmbiguousName(
+                                    Location.NOWHERE, new String[] {DEFAULT_TIME_ZONE})
+                        });
             default:
                 throw new ParseException(
                         "Unsupported data type cast: " + sqlDataTypeSpec.toString());
