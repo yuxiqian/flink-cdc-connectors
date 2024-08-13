@@ -64,7 +64,7 @@ RELEASED_VERSIONS = {
   }
 }.freeze
 
-HEAD_VERSION = '3.2-SNAPSHOT'
+HEAD_VERSION = '3.3-SNAPSHOT'
 
 def download_or_get(link)
   `mkdir -p cache`
