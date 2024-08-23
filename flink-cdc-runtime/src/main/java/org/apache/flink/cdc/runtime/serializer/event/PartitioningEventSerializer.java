@@ -64,14 +64,20 @@ public class PartitioningEventSerializer extends TypeSerializerSingleton<Partiti
 
     @Override
     public void serialize(PartitioningEvent record, DataOutputView target) throws IOException {
+        System.out.printf(">>> Partitioning event %s is being serialized...\n", record);
         eventSerializer.serialize(record.getPayload(), target);
         target.writeInt(record.getTargetPartition());
+        System.out.printf(">>> Partitioning event %s has been serialized.\n", record);
     }
 
     @Override
     public PartitioningEvent deserialize(DataInputView source) throws IOException {
+        System.out.println(">>> Partitioning event is being deserialized...");
         Event payload = eventSerializer.deserialize(source);
         int targetPartition = source.readInt();
+        System.out.printf(
+                ">>> Partitioning event with {%s, %d} has been deserialized...\n",
+                payload, targetPartition);
         return new PartitioningEvent(payload, targetPartition);
     }
 

@@ -83,12 +83,15 @@ public final class EventSerializer extends TypeSerializerSingleton<Event> {
     @Override
     public void serialize(Event record, DataOutputView target) throws IOException {
         if (record instanceof FlushEvent) {
+            System.out.println("A FlushEvent is being serialized...");
             enumSerializer.serialize(EventClass.FLUSH_EVENT, target);
             tableIdSerializer.serialize(((FlushEvent) record).getTableId(), target);
         } else if (record instanceof SchemaChangeEvent) {
+            System.out.printf("A SchemaChangeEvent %s is being serialized...\n", record);
             enumSerializer.serialize(EventClass.SCHEME_CHANGE_EVENT, target);
             schemaChangeEventSerializer.serialize((SchemaChangeEvent) record, target);
         } else if (record instanceof DataChangeEvent) {
+            System.out.printf("A DataChangeEvent %s is being serialized...\n", record);
             enumSerializer.serialize(EventClass.DATA_CHANGE_EVENT, target);
             dataChangeEventSerializer.serialize((DataChangeEvent) record, target);
         } else {
@@ -101,10 +104,13 @@ public final class EventSerializer extends TypeSerializerSingleton<Event> {
         EventClass eventClass = enumSerializer.deserialize(source);
         switch (eventClass) {
             case FLUSH_EVENT:
+                System.out.println("A FlushEvent is being deserialized...");
                 return new FlushEvent(tableIdSerializer.deserialize(source));
             case DATA_CHANGE_EVENT:
+                System.out.println("A DataChangeEvent is being deserialized...");
                 return dataChangeEventSerializer.deserialize(source);
             case SCHEME_CHANGE_EVENT:
+                System.out.println("A SchemaChangeEvent is being deserialized...");
                 return schemaChangeEventSerializer.deserialize(source);
             default:
                 throw new UnsupportedOperationException("Unknown event type: " + eventClass);
