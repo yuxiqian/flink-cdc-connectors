@@ -53,6 +53,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -117,6 +118,8 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                         .withEnv("FLINK_PROPERTIES", flinkProperties)
                         .dependsOn(jobManager)
                         .withLogConsumer(taskManagerConsumer);
+
+        taskManager.setPortBindings(Collections.singletonList("5005:5005"));
 
         Startables.deepStart(Stream.of(jobManager)).join();
         Startables.deepStart(Stream.of(taskManager)).join();
@@ -275,6 +278,7 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                         "taskmanager.numberOfTaskSlots: 20",
                         "parallelism.default: 12",
                         "execution.checkpointing.interval: 300",
+                        "env.java.opts.taskmanager: \"-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:5005\"",
                         javaOptsConfig));
     }
 }

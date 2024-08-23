@@ -31,7 +31,8 @@ public class EventPartitioner implements Partitioner<Integer> {
                             "The target of the event %d is greater than number of downstream partitions %d",
                             target, numPartitions));
         }
-        System.out.printf(">>> EventPartitioner Received partition request %d / %d\n", target, numPartitions);
+        System.out.printf(
+                ">>> EventPartitioner Received partition request %d / %d\n", target, numPartitions);
         return target;
     }
 }

@@ -54,7 +54,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
     protected static final String MYSQL_TEST_PASSWORD = "mysqlpw";
     protected static final String MYSQL_DRIVER_CLASS = "com.mysql.cj.jdbc.Driver";
     protected static final String INTER_CONTAINER_MYSQL_ALIAS = "mysql";
-    protected static final long EVENT_DEFAULT_TIMEOUT = 6000000000000L;
+    protected static final long EVENT_DEFAULT_TIMEOUT = 30000000000L;
 
     @ClassRule
     public static final MySqlContainer MYSQL =
