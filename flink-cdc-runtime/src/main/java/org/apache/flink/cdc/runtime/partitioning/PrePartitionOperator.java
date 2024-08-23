@@ -88,6 +88,10 @@ public class PrePartitionOperator extends AbstractStreamOperator<PartitioningEve
             broadcastEvent(event);
         } else if (event instanceof FlushEvent) {
             // Broadcast FlushEvent
+            LOG.info(
+                    ">>> PrePartition[{}] received a FlushEvent for {}. Going to broadcast it...",
+                    getRuntimeContext().getIndexOfThisSubtask(),
+                    ((FlushEvent) event).getTableId());
             broadcastEvent(event);
         } else if (event instanceof DataChangeEvent) {
             // Partition DataChangeEvent by table ID and primary keys
@@ -107,7 +111,15 @@ public class PrePartitionOperator extends AbstractStreamOperator<PartitioningEve
     }
 
     private void broadcastEvent(Event toBroadcast) {
+        LOG.info(
+                ">>> PrePartition[{}] current downstreamParallelism: {}",
+                getRuntimeContext().getIndexOfThisSubtask(),
+                downstreamParallelism);
         for (int i = 0; i < downstreamParallelism; i++) {
+            LOG.info(
+                    ">>> PrePartition[{}] is broadcasting event: {}",
+                    getRuntimeContext().getIndexOfThisSubtask(),
+                    new PartitioningEvent(toBroadcast, i));
             output.collect(new StreamRecord<>(new PartitioningEvent(toBroadcast, i)));
         }
     }

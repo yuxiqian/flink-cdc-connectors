@@ -149,9 +149,12 @@ public class DataSinkWriterOperator<CommT> extends AbstractStreamOperator<Commit
     @Override
     public void processElement(StreamRecord<Event> element) throws Exception {
         Event event = element.getValue();
-
         // FlushEvent triggers flush
         if (event instanceof FlushEvent) {
+            LOG.info(
+                    ">>> DataSinkWriter[{}] Received FlushEvent for {}.",
+                    getRuntimeContext().getIndexOfThisSubtask(),
+                    ((FlushEvent) event).getTableId());
             handleFlushEvent(((FlushEvent) event));
             return;
         }
@@ -197,6 +200,10 @@ public class DataSinkWriterOperator<CommT> extends AbstractStreamOperator<Commit
     // ----------------------------- Helper functions -------------------------------
 
     private void handleFlushEvent(FlushEvent event) throws Exception {
+        LOG.info(
+                "S>{} Going to send flush event of {}",
+                getRuntimeContext().getIndexOfThisSubtask(),
+                event.getTableId());
         copySinkWriter.flush(false);
         schemaEvolutionClient.notifyFlushSuccess(
                 getRuntimeContext().getIndexOfThisSubtask(), event.getTableId());

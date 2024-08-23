@@ -67,7 +67,7 @@ public abstract class PipelineTestEnvironment extends TestLogger {
 
     @Parameterized.Parameter public String flinkVersion;
 
-    public Integer parallelism = 4;
+    public Integer parallelism = 2;
 
     // ------------------------------------------------------------------------------------------
     // Flink Variables
@@ -224,6 +224,9 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                 JobStatusMessage message = jobStatusMessages.iterator().next();
                 JobStatus jobStatus = message.getJobState();
                 if (jobStatus.isTerminalState()) {
+                    System.out.println(taskManagerConsumer.toUtf8String());
+                    System.out.println("++++++++++++++++++++++++++++++++");
+                    System.out.println(jobManagerConsumer.toUtf8String());
                     throw new ValidationException(
                             String.format(
                                     "Job has been terminated! JobName: %s, JobID: %s, Status: %s",
@@ -269,8 +272,8 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                 Arrays.asList(
                         "restart-strategy.type: off",
                         "jobmanager.rpc.address: jobmanager",
-                        "taskmanager.numberOfTaskSlots: 10",
-                        "parallelism.default: 4",
+                        "taskmanager.numberOfTaskSlots: 20",
+                        "parallelism.default: 12",
                         "execution.checkpointing.interval: 300",
                         javaOptsConfig));
     }

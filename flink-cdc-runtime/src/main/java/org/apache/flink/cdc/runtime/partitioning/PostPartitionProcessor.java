@@ -29,6 +29,11 @@ import org.apache.flink.cdc.common.event.Event;
 public class PostPartitionProcessor extends RichMapFunction<PartitioningEvent, Event> {
     @Override
     public Event map(PartitioningEvent value) throws Exception {
+        System.out.printf(
+                ">>> PostPartitionOperator[%d] Received partitioned value: %s to target partition: %s\n",
+                getRuntimeContext().getIndexOfThisSubtask(),
+                value.getPayload(),
+                value.getTargetPartition());
         return value.getPayload();
     }
 }

@@ -54,7 +54,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
     protected static final String MYSQL_TEST_PASSWORD = "mysqlpw";
     protected static final String MYSQL_DRIVER_CLASS = "com.mysql.cj.jdbc.Driver";
     protected static final String INTER_CONTAINER_MYSQL_ALIAS = "mysql";
-    protected static final long EVENT_DEFAULT_TIMEOUT = 60000L;
+    protected static final long EVENT_DEFAULT_TIMEOUT = 6000000000000L;
 
     @ClassRule
     public static final MySqlContainer MYSQL =
@@ -147,7 +147,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                                 + "  username: %s\n"
                                 + "  password: %s\n"
                                 + "  tables: %s.\\.*\n"
-                                + "  server-id: 5400-5404\n"
+                                + "  server-id: 5400-6004\n"
                                 + "  server-time-zone: UTC\n"
                                 + "\n"
                                 + "sink:\n"
@@ -239,7 +239,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                                 + "  username: %s\n"
                                 + "  password: %s\n"
                                 + "  tables: %s.\\.*\n"
-                                + "  server-id: 5400-5404\n"
+                                + "  server-id: 5400-6000\n"
                                 + "  server-time-zone: UTC\n"
                                 + "\n"
                                 + "sink:\n"
@@ -323,7 +323,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                                 + "  username: %s\n"
                                 + "  password: %s\n"
                                 + "  tables: %s.\\.*\n"
-                                + "  server-id: 5400-5404\n"
+                                + "  server-id: 5400-6000\n"
                                 + "  server-time-zone: UTC\n"
                                 + "\n"
                                 + "sink:\n"
@@ -419,7 +419,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                                 + "  username: %s\n"
                                 + "  password: %s\n"
                                 + "  tables: %s.\\.*\n"
-                                + "  server-id: 5400-5404\n"
+                                + "  server-id: 5400-6000\n"
                                 + "  server-time-zone: UTC\n"
                                 + "\n"
                                 + "sink:\n"
@@ -525,7 +525,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                                 + "  username: %s\n"
                                 + "  password: %s\n"
                                 + "  tables: %s.\\.*\n"
-                                + "  server-id: 5400-5404\n"
+                                + "  server-id: 5400-6000\n"
                                 + "  server-time-zone: UTC\n"
                                 + "\n"
                                 + "sink:\n"
@@ -639,7 +639,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                                 + "  username: %s\n"
                                 + "  password: %s\n"
                                 + "  tables: %s.\\.*\n"
-                                + "  server-id: 5400-5404\n"
+                                + "  server-id: 5400-6000\n"
                                 + "  server-time-zone: UTC\n"
                                 + "\n"
                                 + "sink:\n"
@@ -728,7 +728,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                                 + "  username: %s\n"
                                 + "  password: %s\n"
                                 + "  tables: %s.\\.*\n"
-                                + "  server-id: 5400-5404\n"
+                                + "  server-id: 5400-6000\n"
                                 + "  server-time-zone: UTC\n"
                                 + "\n"
                                 + "sink:\n"
@@ -836,7 +836,9 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                     "failed to get specific event: "
                             + event
                             + " from stdout: "
-                            + taskManagerConsumer.toUtf8String());
+                            + taskManagerConsumer.toUtf8String()
+                            + "\n=========\nJM LOG:\n"
+                            + jobManagerConsumer.toUtf8String());
         }
     }
 

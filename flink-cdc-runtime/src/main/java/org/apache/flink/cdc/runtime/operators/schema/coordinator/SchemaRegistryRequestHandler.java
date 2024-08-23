@@ -253,6 +253,10 @@ public class SchemaRegistryRequestHandler implements Closeable {
      */
     public void flushSuccess(TableId tableId, int sinkSubtask, int parallelism) {
         flushedSinkWriters.add(sinkSubtask);
+        LOG.info(
+                ">>> RegistryRequestHandler: Received flush success event from {} for {}.",
+                sinkSubtask,
+                tableId);
         if (activeSinkWriters.size() < parallelism) {
             LOG.info(
                     "Not all active sink writers have been registered. Current {}, expected {}.",

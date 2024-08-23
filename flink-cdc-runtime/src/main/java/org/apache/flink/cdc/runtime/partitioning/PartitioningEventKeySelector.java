@@ -25,6 +25,7 @@ import org.apache.flink.cdc.common.annotation.Internal;
 public class PartitioningEventKeySelector implements KeySelector<PartitioningEvent, Integer> {
     @Override
     public Integer getKey(PartitioningEvent event) {
+        System.out.printf(">>> PartitioningEventKeySelector key selecting request %s\n", event);
         return event.getTargetPartition();
     }
 }
