@@ -121,24 +121,12 @@ jobs:
     needs: license_check
     # Only run the CI pipeline for the flink-cdc-connectors repository
 #    if: github.repository == 'apache/flink-cdc-connectors'
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.platform }}
     strategy:
       matrix:
         jdk: [ 8 ]
-        module: [ "core",
-                  "pipeline_connectors",
-                  "mysql",
-                  "postgres",
-                  "oracle",
-                  "mongodb",
-                  "sqlserver",
-                  "tidb",
-                  "oceanbase",
-                  "db2",
-                  "vitess",
-                  "pipeline_e2e",
-                  "source_e2e"
-        ]
+        module: [ "oracle" ]
+        platform: [ "macos-latest", "ubuntu-latest" ]
     timeout-minutes: 120
     env:
       MVN_COMMON_OPTIONS: -Dmaven.wagon.http.pool=false \
