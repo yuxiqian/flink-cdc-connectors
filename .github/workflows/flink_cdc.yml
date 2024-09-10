@@ -132,7 +132,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: ${{ matrix.jdk }}
-          distribution: 'temurin'
+          distribution: 'zulu'
           cache: 'maven'
 
       - name: Set Maven 3.8.6
