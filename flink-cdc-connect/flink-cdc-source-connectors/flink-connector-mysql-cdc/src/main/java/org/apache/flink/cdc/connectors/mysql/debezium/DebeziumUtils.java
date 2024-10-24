@@ -56,6 +56,8 @@ import java.util.Properties;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.function.Predicate;
 
+import static io.debezium.connector.mysql.MySqlConnection.showBinaryLogStatement;
+
 /** Utilities related to Debezium. */
 public class DebeziumUtils {
     private static final String QUOTED_CHARACTER = "`";
@@ -118,10 +120,9 @@ public class DebeziumUtils {
 
     /** Fetch current binlog offsets in MySql Server. */
     public static BinlogOffset currentBinlogOffset(JdbcConnection jdbc) {
-        final String showMasterStmt = "SHOW MASTER STATUS";
         try {
             return jdbc.queryAndMap(
-                    showMasterStmt,
+                    showBinaryLogStatement,
                     rs -> {
                         if (rs.next()) {
                             final String binlogFilename = rs.getString(1);
@@ -135,14 +136,14 @@ public class DebeziumUtils {
                         } else {
                             throw new FlinkRuntimeException(
                                     "Cannot read the binlog filename and position via '"
-                                            + showMasterStmt
+                                            + showBinaryLogStatement
                                             + "'. Make sure your server is correctly configured");
                         }
                     });
         } catch (SQLException e) {
             throw new FlinkRuntimeException(
                     "Cannot read the binlog filename and position via '"
-                            + showMasterStmt
+                            + showBinaryLogStatement
                             + "'. Make sure your server is correctly configured",
                     e);
         }
