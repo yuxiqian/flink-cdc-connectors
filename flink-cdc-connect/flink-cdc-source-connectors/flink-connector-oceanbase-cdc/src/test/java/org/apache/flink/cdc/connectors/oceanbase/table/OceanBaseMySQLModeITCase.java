@@ -593,5 +593,6 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
                         "+I(109,spare tire,24 inch spare tire,22.2000000000)");
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
         assertContainsInAnyOrder(expected, actual);
+        result.getJobClient().get().cancel().get();
     }
 }
