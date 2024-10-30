@@ -77,7 +77,7 @@ public class MySqlConnection extends JdbcConnection {
     private static String MYSQL_CLASSIC_SHOW_BINARY_LOG_STATEMENT = "SHOW MASTER STATUS";
     private static String MYSQL_NEW_SHOW_BINARY_LOG_STATEMENT = "SHOW BINARY LOG STATUS";
     private static boolean isBinaryLogStatementUndetermined = true;
-    public static String showBinaryLogStatement;
+    private static String showBinaryLogStatement;
 
     /**
      * Creates a new connection using the supplied configuration.

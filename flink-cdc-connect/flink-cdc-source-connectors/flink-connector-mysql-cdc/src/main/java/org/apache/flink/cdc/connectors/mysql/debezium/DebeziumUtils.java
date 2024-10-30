@@ -56,8 +56,6 @@ import java.util.Properties;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.function.Predicate;
 
-import static io.debezium.connector.mysql.MySqlConnection.showBinaryLogStatement;
-
 /** Utilities related to Debezium. */
 public class DebeziumUtils {
     private static final String QUOTED_CHARACTER = "`";
@@ -119,7 +117,8 @@ public class DebeziumUtils {
     }
 
     /** Fetch current binlog offsets in MySql Server. */
-    public static BinlogOffset currentBinlogOffset(JdbcConnection jdbc) {
+    public static BinlogOffset currentBinlogOffset(MySqlConnection jdbc) {
+        String showBinaryLogStatement = jdbc.probeShowBinaryLogStatement();
         try {
             return jdbc.queryAndMap(
                     showBinaryLogStatement,
