@@ -86,7 +86,6 @@ public class SchemaRegistryRequestHandler implements Closeable {
      */
     private volatile RequestStatus schemaChangeStatus;
 
-    private final List<Integer> pendingSubTaskIds;
     private final Object schemaChangeRequestLock;
 
     private volatile Throwable currentChangeException;
@@ -127,7 +126,6 @@ public class SchemaRegistryRequestHandler implements Closeable {
         this.currentIgnoredSchemaChanges = new ArrayList<>();
 
         this.schemaChangeStatus = RequestStatus.IDLE;
-        this.pendingSubTaskIds = new ArrayList<>();
         this.schemaChangeRequestLock = new Object();
 
         this.currentSchemaChangeVersion = new AtomicLong(0);
@@ -150,33 +148,6 @@ public class SchemaRegistryRequestHandler implements Closeable {
             // Make sure we handle the first request in the pending list to avoid out-of-order
             // waiting and blocks checkpointing mechanism.
             if (schemaChangeStatus == RequestStatus.IDLE) {
-                if (pendingSubTaskIds.isEmpty()) {
-                    LOG.info(
-                            "Received schema change permission request {} from table {} from subTask {}. Pending list is empty, handling this.",
-                            request.getSchemaChangeEvent(),
-                            request.getTableId().toString(),
-                            requestSubTaskId);
-                } else if (pendingSubTaskIds.get(0) == requestSubTaskId) {
-                    LOG.info(
-                            "Received schema change permission request {} from table {} from subTask {}. It is on the first of the pending list, handling this.",
-                            request.getSchemaChangeEvent(),
-                            request.getTableId().toString(),
-                            requestSubTaskId);
-                    pendingSubTaskIds.remove(0);
-                } else {
-                    LOG.info(
-                            "Received schema change event request {} from table {} from subTask {}. It is not the first of the pending list ({}).",
-                            request.getSchemaChangeEvent(),
-                            request.getTableId().toString(),
-                            requestSubTaskId,
-                            pendingSubTaskIds);
-                    if (!pendingSubTaskIds.contains(requestSubTaskId)) {
-                        pendingSubTaskIds.add(requestSubTaskId);
-                    }
-                    response.complete(wrap(AskForSchemaChangePermissionResponse.rejected()));
-                    return;
-                }
-
                 LOG.info(
                         "SchemaChangeStatus switched from IDLE to WAITING_FOR_FLUSH, other requests will be blocked.");
                 // This request has been accepted.
@@ -187,13 +158,9 @@ public class SchemaRegistryRequestHandler implements Closeable {
                                         currentSchemaChangeVersion.incrementAndGet())));
             } else {
                 LOG.info(
-                        "Schema Registry is busy processing a schema change request, could not handle request {} for now. Added {} to pending list ({}).",
+                        "Schema Registry is busy processing a schema change request, could not handle request {} from subTask {} for now.",
                         request,
-                        requestSubTaskId,
-                        pendingSubTaskIds);
-                if (!pendingSubTaskIds.contains(requestSubTaskId)) {
-                    pendingSubTaskIds.add(requestSubTaskId);
-                }
+                        requestSubTaskId);
                 response.complete(wrap(AskForSchemaChangePermissionResponse.rejected()));
             }
         }
@@ -246,7 +213,7 @@ public class SchemaRegistryRequestHandler implements Closeable {
             LOG.info(
                     "SchemaChangeStatus switched from WAITING_FOR_FLUSH to IDLE for request {} due to ignored request.",
                     request);
-
+            schemaChangeStatus = RequestStatus.IDLE;
             response.complete(wrap(SchemaChangeResponse.ignored()));
             return;
         }
@@ -370,15 +337,15 @@ public class SchemaRegistryRequestHandler implements Closeable {
             return;
         }
         if (flushedSinkWriters.equals(activeSinkWriters)) {
-            Preconditions.checkState(
-                    schemaChangeStatus == RequestStatus.WAITING_FOR_FLUSH,
-                    "Illegal schemaChangeStatus state: should be WAITING_FOR_FLUSH before collecting enough FlushEvents, not "
-                            + schemaChangeStatus);
 
-            schemaChangeStatus = RequestStatus.APPLYING;
-            LOG.info(
-                    "All sink subtasks have flushed for table {}. State switched from WAITING_FOR_FLUSH to APPLYING.",
-                    tableId.toString());
+            // If current state isn't WAITING_FOR_FLUSH, it is likely that the schema change request
+            // was abandoned before.
+            if (schemaChangeStatus == RequestStatus.WAITING_FOR_FLUSH) {
+                schemaChangeStatus = RequestStatus.APPLYING;
+                LOG.info(
+                        "All sink subtasks have flushed for table {}. State switched from WAITING_FOR_FLUSH to APPLYING.",
+                        tableId.toString());
+            }
         }
     }
 
@@ -558,7 +525,7 @@ public class SchemaRegistryRequestHandler implements Closeable {
     //
     //  A: When a request came to an idling request handler.
     //  B: When current request is duplicate or ignored by LENIENT / routed table merging
-    // strategies.
+    // strategies, or FlushEvent got blocked and the request is abandoned.
     //  C: When schema registry collected enough flush success events, and actually started to apply
     // schema changes.
     //  D: When schema change application finishes (successfully or with exceptions)

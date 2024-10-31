@@ -409,7 +409,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testMultipleRoute() throws Exception {
+    public void atestMultipleRoute() throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"

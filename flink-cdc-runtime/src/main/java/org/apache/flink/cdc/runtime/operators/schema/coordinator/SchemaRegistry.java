@@ -420,11 +420,6 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
     private void handleGetOriginalSchemaRequest(
             GetOriginalSchemaRequest getOriginalSchemaRequest,
             CompletableFuture<CoordinationResponse> response) {
-        LOG.info(
-                "Handling original schema request: {}. Current schemaMap:\nO: {}\nE: {}",
-                getOriginalSchemaRequest,
-                schemaManager.originalSchemas,
-                schemaManager.evolvedSchemas);
         int schemaVersion = getOriginalSchemaRequest.getSchemaVersion();
         TableId tableId = getOriginalSchemaRequest.getTableId();
         if (schemaVersion == GetOriginalSchemaRequest.LATEST_SCHEMA_VERSION) {

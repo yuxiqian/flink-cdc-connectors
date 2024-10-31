@@ -168,7 +168,7 @@ public class SchemaEvolveTest {
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId, 1L)),
+                                    Collections.singletonList(new FlushEvent(tableId, 2L)),
                                     addColumnEvents));
 
             Schema schemaV2 =
@@ -227,7 +227,7 @@ public class SchemaEvolveTest {
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId, 1L)),
+                                    Collections.singletonList(new FlushEvent(tableId, 3L)),
                                     renameColumnEvents));
 
             Schema schemaV3 =
@@ -272,7 +272,7 @@ public class SchemaEvolveTest {
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId, 1L)),
+                                    Collections.singletonList(new FlushEvent(tableId, 4L)),
                                     alterColumnTypeEvents));
 
             Schema schemaV4 =
@@ -308,7 +308,7 @@ public class SchemaEvolveTest {
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId, 1L)),
+                                    Collections.singletonList(new FlushEvent(tableId, 5L)),
                                     dropColumnEvents));
 
             Schema schemaV5 =
@@ -425,7 +425,7 @@ public class SchemaEvolveTest {
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId, 1L)),
+                                    Collections.singletonList(new FlushEvent(tableId, 2L)),
                                     addColumnEvents));
 
             Schema schemaV2 =
@@ -484,7 +484,7 @@ public class SchemaEvolveTest {
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId, 1L)),
+                                    Collections.singletonList(new FlushEvent(tableId, 3L)),
                                     renameColumnEvents));
 
             Schema schemaV3 =
@@ -529,7 +529,7 @@ public class SchemaEvolveTest {
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId, 1L)),
+                                    Collections.singletonList(new FlushEvent(tableId, 4L)),
                                     alterColumnTypeEvents));
 
             Schema schemaV4 =
@@ -565,7 +565,7 @@ public class SchemaEvolveTest {
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId, 1L)),
+                                    Collections.singletonList(new FlushEvent(tableId, 5L)),
                                     dropColumnEvents));
 
             Schema schemaV5 =
@@ -787,7 +787,7 @@ public class SchemaEvolveTest {
 
             List<Event> expectedEvents =
                     Arrays.asList(
-                            new FlushEvent(tableId, 1L),
+                            new FlushEvent(tableId, 2L),
                             DataChangeEvent.insertEvent(
                                     tableId,
                                     buildRecord(INT, 4, STRING, "Derrida", SMALLINT, (short) 20)),
@@ -855,7 +855,7 @@ public class SchemaEvolveTest {
 
             List<Event> expectedEvents =
                     Arrays.asList(
-                            new FlushEvent(tableId, 1L),
+                            new FlushEvent(tableId, 3L),
                             DataChangeEvent.insertEvent(
                                     tableId,
                                     buildRecord(INT, 6, STRING, null, SMALLINT, (short) 22)),
@@ -904,7 +904,7 @@ public class SchemaEvolveTest {
 
             List<Event> expectedEvents =
                     Arrays.asList(
-                            new FlushEvent(tableId, 1L),
+                            new FlushEvent(tableId, 4L),
                             DataChangeEvent.insertEvent(
                                     tableId, buildRecord(INT, 8, STRING, null, SMALLINT, null)),
                             DataChangeEvent.insertEvent(
@@ -945,7 +945,7 @@ public class SchemaEvolveTest {
 
             List<Event> expectedEvents =
                     Arrays.asList(
-                            new FlushEvent(tableId, 1L),
+                            new FlushEvent(tableId, 5L),
                             DataChangeEvent.insertEvent(
                                     tableId, buildRecord(INT, 12, STRING, null, DOUBLE, null)),
                             DataChangeEvent.insertEvent(
@@ -1159,7 +1159,7 @@ public class SchemaEvolveTest {
             processEvent(schemaOperator, addColumnEvents);
 
             List<Event> expectedEvents = new ArrayList<>();
-            expectedEvents.add(new FlushEvent(tableId, 1L));
+            expectedEvents.add(new FlushEvent(tableId, 2L));
             expectedEvents.addAll(addColumnEvents);
 
             Assertions.assertThat(
@@ -1221,7 +1221,7 @@ public class SchemaEvolveTest {
             processEvent(schemaOperator, renameColumnEvents);
 
             List<Event> expectedEvents = new ArrayList<>();
-            expectedEvents.add(new FlushEvent(tableId, 1L));
+            expectedEvents.add(new FlushEvent(tableId, 3L));
             expectedEvents.addAll(renameColumnEvents);
 
             Assertions.assertThat(
@@ -1266,7 +1266,7 @@ public class SchemaEvolveTest {
 
             List<Event> expectedEvents =
                     Arrays.asList(
-                            new FlushEvent(tableId, 1L),
+                            new FlushEvent(tableId, 4L),
                             DataChangeEvent.insertEvent(
                                     tableId,
                                     buildRecord(
@@ -1324,7 +1324,7 @@ public class SchemaEvolveTest {
 
             List<Event> expectedEvents =
                     Arrays.asList(
-                            new FlushEvent(tableId, 1L),
+                            new FlushEvent(tableId, 5L),
                             DataChangeEvent.insertEvent(
                                     tableId,
                                     buildRecord(
@@ -1471,7 +1471,7 @@ public class SchemaEvolveTest {
             processEvent(schemaOperator, addColumnEvents);
 
             List<Event> expectedEvents = new ArrayList<>();
-            expectedEvents.add(new FlushEvent(tableId, 1L));
+            expectedEvents.add(new FlushEvent(tableId, 2L));
             expectedEvents.addAll(addColumnEvents);
 
             Assertions.assertThat(
@@ -1533,7 +1533,7 @@ public class SchemaEvolveTest {
             processEvent(schemaOperator, renameColumnEvents);
 
             List<Event> expectedEvents = new ArrayList<>();
-            expectedEvents.add(new FlushEvent(tableId, 1L));
+            expectedEvents.add(new FlushEvent(tableId, 3L));
             expectedEvents.addAll(renameColumnEvents);
 
             Assertions.assertThat(
@@ -1578,7 +1578,7 @@ public class SchemaEvolveTest {
 
             List<Event> expectedEvents =
                     Arrays.asList(
-                            new FlushEvent(tableId, 1L),
+                            new FlushEvent(tableId, 4L),
                             DataChangeEvent.insertEvent(
                                     tableId,
                                     buildRecord(
@@ -1636,7 +1636,7 @@ public class SchemaEvolveTest {
 
             List<Event> expectedEvents =
                     Arrays.asList(
-                            new FlushEvent(tableId, 1L),
+                            new FlushEvent(tableId, 5L),
                             DataChangeEvent.insertEvent(
                                     tableId,
                                     buildRecord(
@@ -1776,7 +1776,7 @@ public class SchemaEvolveTest {
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId, 1L)),
+                                    Collections.singletonList(new FlushEvent(tableId, 2L)),
                                     addColumnEvents));
 
             Schema schemaV2 =
@@ -1884,7 +1884,7 @@ public class SchemaEvolveTest {
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId, 1L)),
+                                    Collections.singletonList(new FlushEvent(tableId, 3L)),
                                     lenientRenameColumnEvents));
 
             Schema schemaV3 =
@@ -1959,7 +1959,7 @@ public class SchemaEvolveTest {
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId, 1L)),
+                                    Collections.singletonList(new FlushEvent(tableId, 4L)),
                                     lenientAlterColumnTypeEvents));
 
             Schema schemaV4 =
@@ -2003,6 +2003,7 @@ public class SchemaEvolveTest {
 
             List<Event> lenientDropColumnEvents =
                     Arrays.asList(
+                            new FlushEvent(tableId, 5L),
                             DataChangeEvent.insertEvent(
                                     tableId,
                                     buildRecord(
@@ -2142,7 +2143,7 @@ public class SchemaEvolveTest {
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId, 1L)),
+                                    Collections.singletonList(new FlushEvent(tableId, 2L)),
                                     lenientDropColumnEvents));
 
             Schema schemaV2 =
@@ -2257,7 +2258,7 @@ public class SchemaEvolveTest {
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId, 1L)),
+                                    Collections.singletonList(new FlushEvent(tableId, 3L)),
                                     lenientAddColumnEvents));
 
             Schema schemaV3 =
@@ -2375,7 +2376,7 @@ public class SchemaEvolveTest {
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId, 1L)),
+                                    Collections.singletonList(new FlushEvent(tableId, 4L)),
                                     lenientRenameColumnEvents));
 
             Schema schemaV4 =

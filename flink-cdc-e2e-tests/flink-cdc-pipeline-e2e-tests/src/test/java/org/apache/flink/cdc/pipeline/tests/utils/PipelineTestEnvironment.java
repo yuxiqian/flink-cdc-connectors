@@ -140,6 +140,12 @@ public abstract class PipelineTestEnvironment extends TestLogger {
         if (taskManager != null) {
             taskManager.stop();
         }
+        // TODO FOR DEBUGGING ONLY. REVERT THIS BEFORE CREATING PR.
+        System.out.println("===================================");
+        System.out.println(jobManagerConsumer.toUtf8String());
+        System.out.println("===================================");
+        System.out.println(taskManagerConsumer.toUtf8String());
+        System.out.println("===================================");
     }
 
     /** Allow overriding the default flink properties. */
