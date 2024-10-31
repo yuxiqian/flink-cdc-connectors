@@ -253,7 +253,10 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
                     schemaRegistryGateway.sendOperatorEventToCoordinator(
                             SINK_OPERATOR_ID,
                             new SerializedValue<>(
-                                    new FlushSuccessEvent(0, ((FlushEvent) event).getTableId())));
+                                    new FlushSuccessEvent(
+                                            0,
+                                            ((FlushEvent) event).getTableId(),
+                                            ((FlushEvent) event).getVersionCode())));
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }

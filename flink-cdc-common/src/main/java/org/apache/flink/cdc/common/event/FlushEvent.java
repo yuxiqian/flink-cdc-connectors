@@ -28,12 +28,23 @@ public class FlushEvent implements Event {
     /** The schema changes from which table. */
     private final TableId tableId;
 
-    public FlushEvent(TableId tableId) {
+    /**
+     * The schema evolution version code that increases for each schema change request. Used for
+     * distinguishing FlushEvents triggered by different schema change events.
+     */
+    private final long versionCode;
+
+    public FlushEvent(TableId tableId, long versionCode) {
         this.tableId = tableId;
+        this.versionCode = versionCode;
     }
 
     public TableId getTableId() {
         return tableId;
+    }
+
+    public long getVersionCode() {
+        return versionCode;
     }
 
     @Override
@@ -45,11 +56,12 @@ public class FlushEvent implements Event {
             return false;
         }
         FlushEvent that = (FlushEvent) o;
-        return Objects.equals(tableId, that.tableId);
+        return Objects.equals(tableId, that.tableId)
+                && Objects.equals(versionCode, that.versionCode);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(tableId);
+        return Objects.hash(tableId, versionCode);
     }
 }

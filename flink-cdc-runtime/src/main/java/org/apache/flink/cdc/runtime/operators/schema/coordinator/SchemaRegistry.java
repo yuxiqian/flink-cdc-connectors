@@ -24,6 +24,8 @@ import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.runtime.operators.schema.SchemaOperator;
+import org.apache.flink.cdc.runtime.operators.schema.event.AbandonSchemaChangeRequest;
+import org.apache.flink.cdc.runtime.operators.schema.event.AskForSchemaChangePermissionRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.FlushSuccessEvent;
 import org.apache.flink.cdc.runtime.operators.schema.event.GetEvolvedSchemaRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.GetEvolvedSchemaResponse;
@@ -179,12 +181,14 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
                         if (event instanceof FlushSuccessEvent) {
                             FlushSuccessEvent flushSuccessEvent = (FlushSuccessEvent) event;
                             LOG.info(
-                                    "Sink subtask {} succeed flushing for table {}.",
+                                    "Sink subtask {} succeed flushing for table {} (version code: {}).",
                                     flushSuccessEvent.getSubtask(),
-                                    flushSuccessEvent.getTableId().toString());
+                                    flushSuccessEvent.getTableId().toString(),
+                                    flushSuccessEvent.getVersionCode());
                             requestHandler.flushSuccess(
                                     flushSuccessEvent.getTableId(),
                                     flushSuccessEvent.getSubtask(),
+                                    flushSuccessEvent.getVersionCode(),
                                     currentParallelism);
                         } else if (event instanceof SinkWriterRegisterEvent) {
                             requestHandler.registerSinkWriter(
@@ -267,7 +271,13 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
         runInEventLoop(
                 () -> {
                     try {
-                        if (request instanceof SchemaChangeRequest) {
+                        if (request instanceof AskForSchemaChangePermissionRequest) {
+                            AskForSchemaChangePermissionRequest
+                                    askForSchemaChangePermissionRequest =
+                                            (AskForSchemaChangePermissionRequest) request;
+                            requestHandler.handleAskForPermissionRequest(
+                                    askForSchemaChangePermissionRequest, responseFuture);
+                        } else if (request instanceof SchemaChangeRequest) {
                             SchemaChangeRequest schemaChangeRequest = (SchemaChangeRequest) request;
                             requestHandler.handleSchemaChangeRequest(
                                     schemaChangeRequest, responseFuture);
@@ -279,6 +289,11 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
                         } else if (request instanceof GetOriginalSchemaRequest) {
                             handleGetOriginalSchemaRequest(
                                     (GetOriginalSchemaRequest) request, responseFuture);
+                        } else if (request instanceof AbandonSchemaChangeRequest) {
+                            AbandonSchemaChangeRequest abandonSchemaChangeRequest =
+                                    (AbandonSchemaChangeRequest) request;
+                            requestHandler.handleAbandonSchemaChangeRequest(
+                                    abandonSchemaChangeRequest, responseFuture);
                         } else {
                             throw new IllegalArgumentException(
                                     "Unrecognized CoordinationRequest type: " + request);
@@ -405,7 +420,11 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
     private void handleGetOriginalSchemaRequest(
             GetOriginalSchemaRequest getOriginalSchemaRequest,
             CompletableFuture<CoordinationResponse> response) {
-        LOG.info("Handling original schema request: {}", getOriginalSchemaRequest);
+        LOG.info(
+                "Handling original schema request: {}. Current schemaMap:\nO: {}\nE: {}",
+                getOriginalSchemaRequest,
+                schemaManager.originalSchemas,
+                schemaManager.evolvedSchemas);
         int schemaVersion = getOriginalSchemaRequest.getSchemaVersion();
         TableId tableId = getOriginalSchemaRequest.getTableId();
         if (schemaVersion == GetOriginalSchemaRequest.LATEST_SCHEMA_VERSION) {

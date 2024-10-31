@@ -34,10 +34,15 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.utils.Preconditions;
+import org.apache.flink.cdc.runtime.operators.schema.event.AbandonSchemaChangeRequest;
+import org.apache.flink.cdc.runtime.operators.schema.event.AbandonSchemaChangeResponse;
+import org.apache.flink.cdc.runtime.operators.schema.event.AskForSchemaChangePermissionRequest;
+import org.apache.flink.cdc.runtime.operators.schema.event.AskForSchemaChangePermissionResponse;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeProcessingResponse;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeResponse;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeResultResponse;
+import org.apache.flink.cdc.runtime.operators.schema.event.WaitingForFlushResponse;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 import org.apache.flink.runtime.operators.coordination.OperatorCoordinator;
 
@@ -56,6 +61,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -98,6 +104,8 @@ public class SchemaRegistryRequestHandler implements Closeable {
 
     private final OperatorCoordinator.Context context;
 
+    private final AtomicLong currentSchemaChangeVersion;
+
     public SchemaRegistryRequestHandler(
             MetadataApplier metadataApplier,
             SchemaManager schemaManager,
@@ -121,16 +129,19 @@ public class SchemaRegistryRequestHandler implements Closeable {
         this.schemaChangeStatus = RequestStatus.IDLE;
         this.pendingSubTaskIds = new ArrayList<>();
         this.schemaChangeRequestLock = new Object();
+
+        this.currentSchemaChangeVersion = new AtomicLong(0);
     }
 
     /**
-     * Handle the {@link SchemaChangeRequest} and wait for all sink subtasks flushing.
+     * Handles the permission for starting a schema change request. Will not alter SchemaRegistry
+     * internal state until received the following {@link SchemaChangeRequest}.
      *
      * @param request the received SchemaChangeRequest
      */
-    public void handleSchemaChangeRequest(
-            SchemaChangeRequest request, CompletableFuture<CoordinationResponse> response) {
-
+    public void handleAskForPermissionRequest(
+            AskForSchemaChangePermissionRequest request,
+            CompletableFuture<CoordinationResponse> response) {
         // We use requester subTask ID as the pending ticket, because there will be at most 1 schema
         // change requests simultaneously from each subTask
         int requestSubTaskId = request.getSubTaskId();
@@ -141,13 +152,13 @@ public class SchemaRegistryRequestHandler implements Closeable {
             if (schemaChangeStatus == RequestStatus.IDLE) {
                 if (pendingSubTaskIds.isEmpty()) {
                     LOG.info(
-                            "Received schema change event request {} from table {} from subTask {}. Pending list is empty, handling this.",
+                            "Received schema change permission request {} from table {} from subTask {}. Pending list is empty, handling this.",
                             request.getSchemaChangeEvent(),
                             request.getTableId().toString(),
                             requestSubTaskId);
                 } else if (pendingSubTaskIds.get(0) == requestSubTaskId) {
                     LOG.info(
-                            "Received schema change event request {} from table {} from subTask {}. It is on the first of the pending list, handling this.",
+                            "Received schema change permission request {} from table {} from subTask {}. It is on the first of the pending list, handling this.",
                             request.getSchemaChangeEvent(),
                             request.getTableId().toString(),
                             requestSubTaskId);
@@ -162,36 +173,7 @@ public class SchemaRegistryRequestHandler implements Closeable {
                     if (!pendingSubTaskIds.contains(requestSubTaskId)) {
                         pendingSubTaskIds.add(requestSubTaskId);
                     }
-                    response.complete(wrap(SchemaChangeResponse.busy()));
-                    return;
-                }
-
-                SchemaChangeEvent event = request.getSchemaChangeEvent();
-
-                // If this schema change event has been requested by another subTask, ignore it.
-                if (schemaManager.isOriginalSchemaChangeEventRedundant(event)) {
-                    LOG.info("Event {} has been addressed before, ignoring it.", event);
-                    clearCurrentSchemaChangeRequest();
-                    LOG.info(
-                            "SchemaChangeStatus switched from WAITING_FOR_FLUSH to IDLE for request {} due to duplicated request.",
-                            request);
-                    response.complete(wrap(SchemaChangeResponse.duplicate()));
-                    return;
-                }
-                schemaManager.applyOriginalSchemaChange(event);
-                List<SchemaChangeEvent> derivedSchemaChangeEvents =
-                        calculateDerivedSchemaChangeEvents(request.getSchemaChangeEvent());
-
-                // If this schema change event is filtered out by LENIENT mode or merging table
-                // route strategies, ignore it.
-                if (derivedSchemaChangeEvents.isEmpty()) {
-                    LOG.info("Event {} is omitted from sending to downstream, ignoring it.", event);
-                    clearCurrentSchemaChangeRequest();
-                    LOG.info(
-                            "SchemaChangeStatus switched from WAITING_FOR_FLUSH to IDLE for request {} due to ignored request.",
-                            request);
-
-                    response.complete(wrap(SchemaChangeResponse.ignored()));
+                    response.complete(wrap(AskForSchemaChangePermissionResponse.rejected()));
                     return;
                 }
 
@@ -199,23 +181,10 @@ public class SchemaRegistryRequestHandler implements Closeable {
                         "SchemaChangeStatus switched from IDLE to WAITING_FOR_FLUSH, other requests will be blocked.");
                 // This request has been accepted.
                 schemaChangeStatus = RequestStatus.WAITING_FOR_FLUSH;
-
-                // Backfill pre-schema info for sink applying
-                derivedSchemaChangeEvents.forEach(
-                        e -> {
-                            if (e instanceof SchemaChangeEventWithPreSchema) {
-                                SchemaChangeEventWithPreSchema pe =
-                                        (SchemaChangeEventWithPreSchema) e;
-                                if (!pe.hasPreSchema()) {
-                                    schemaManager
-                                            .getLatestEvolvedSchema(pe.tableId())
-                                            .ifPresent(pe::fillPreSchema);
-                                }
-                            }
-                        });
-                currentDerivedSchemaChangeEvents = new ArrayList<>(derivedSchemaChangeEvents);
-
-                response.complete(wrap(SchemaChangeResponse.accepted(derivedSchemaChangeEvents)));
+                response.complete(
+                        wrap(
+                                AskForSchemaChangePermissionResponse.accepted(
+                                        currentSchemaChangeVersion.incrementAndGet())));
             } else {
                 LOG.info(
                         "Schema Registry is busy processing a schema change request, could not handle request {} for now. Added {} to pending list ({}).",
@@ -225,19 +194,104 @@ public class SchemaRegistryRequestHandler implements Closeable {
                 if (!pendingSubTaskIds.contains(requestSubTaskId)) {
                     pendingSubTaskIds.add(requestSubTaskId);
                 }
-                response.complete(wrap(SchemaChangeResponse.busy()));
+                response.complete(wrap(AskForSchemaChangePermissionResponse.rejected()));
             }
+        }
+    }
+
+    /**
+     * Handle the {@link SchemaChangeRequest} and wait for all sink subtasks flushing.
+     *
+     * @param request the received SchemaChangeRequest
+     */
+    public void handleSchemaChangeRequest(
+            SchemaChangeRequest request, CompletableFuture<CoordinationResponse> response) {
+        if (schemaChangeStatus.equals(RequestStatus.WAITING_FOR_FLUSH)) {
+            LOG.info("Not all sink writers have finished flushing.");
+            response.complete(wrap(new WaitingForFlushResponse()));
+            return;
+        } else if (schemaChangeStatus.equals(RequestStatus.APPLYING)) {
+            LOG.info(
+                    "Received enough FlushSuccessEvent and going to start evolving schema changes.");
+        } else {
+            throw new IllegalStateException(
+                    "Illegal schemaChangeStatus: state should be WAITING_FOR_FLUSH or APPLYING when handlingSchemaChangeRequest, but "
+                            + schemaChangeStatus);
+        }
+
+        SchemaChangeEvent event = request.getSchemaChangeEvent();
+
+        // If this schema change event has been requested by another subTask, ignore it.
+        if (schemaManager.isOriginalSchemaChangeEventRedundant(event)) {
+            LOG.info("Event {} has been addressed before, ignoring it.", event);
+            clearCurrentSchemaChangeRequest();
+            LOG.info(
+                    "SchemaChangeStatus switched from {} to IDLE for request {} due to duplicated request.",
+                    schemaChangeStatus,
+                    request);
+            schemaChangeStatus = RequestStatus.IDLE;
+            response.complete(wrap(SchemaChangeResponse.duplicate()));
+            return;
+        }
+
+        schemaManager.applyOriginalSchemaChange(event);
+        List<SchemaChangeEvent> derivedSchemaChangeEvents =
+                calculateDerivedSchemaChangeEvents(request.getSchemaChangeEvent());
+
+        // If this schema change event is filtered out by LENIENT mode or merging table
+        // route strategies, ignore it.
+        if (derivedSchemaChangeEvents.isEmpty()) {
+            LOG.info("Event {} is omitted from sending to downstream, ignoring it.", event);
+            clearCurrentSchemaChangeRequest();
+            LOG.info(
+                    "SchemaChangeStatus switched from WAITING_FOR_FLUSH to IDLE for request {} due to ignored request.",
+                    request);
+
+            response.complete(wrap(SchemaChangeResponse.ignored()));
+            return;
+        }
+
+        // Backfill pre-schema info for sink applying
+        derivedSchemaChangeEvents.forEach(
+                e -> {
+                    if (e instanceof SchemaChangeEventWithPreSchema) {
+                        SchemaChangeEventWithPreSchema pe = (SchemaChangeEventWithPreSchema) e;
+                        if (!pe.hasPreSchema()) {
+                            schemaManager
+                                    .getLatestEvolvedSchema(pe.tableId())
+                                    .ifPresent(pe::fillPreSchema);
+                        }
+                    }
+                });
+
+        currentDerivedSchemaChangeEvents = new ArrayList<>(derivedSchemaChangeEvents);
+        schemaChangeThreadPool.submit(() -> applySchemaChange(currentDerivedSchemaChangeEvents));
+        response.complete(wrap(SchemaChangeResponse.evolved(derivedSchemaChangeEvents)));
+    }
+
+    /**
+     * Abandon an ongoing {@link SchemaChangeRequest} and be ready for the next request.
+     *
+     * @param request the received SchemaChangeRequest
+     */
+    public void handleAbandonSchemaChangeRequest(
+            AbandonSchemaChangeRequest request, CompletableFuture<CoordinationResponse> response) {
+        // We use requester subTask ID as the pending ticket, because there will be at most 1 schema
+        // change requests simultaneously from each subTask
+        synchronized (schemaChangeRequestLock) {
+            LOG.info("SchemaChangeStatus switched to IDLE, previous request has been abandoned.");
+            clearCurrentSchemaChangeRequest();
+            schemaChangeStatus = RequestStatus.IDLE;
+            response.complete(wrap(new AbandonSchemaChangeResponse()));
         }
     }
 
     /**
      * Apply the schema change to the external system.
      *
-     * @param tableId the table need to change schema
      * @param derivedSchemaChangeEvents list of the schema changes
      */
-    private void applySchemaChange(
-            TableId tableId, List<SchemaChangeEvent> derivedSchemaChangeEvents) {
+    private void applySchemaChange(List<SchemaChangeEvent> derivedSchemaChangeEvents) {
         for (SchemaChangeEvent changeEvent : derivedSchemaChangeEvents) {
             if (changeEvent.getType() != SchemaChangeEventType.CREATE_TABLE) {
                 if (schemaChangeBehavior == SchemaChangeBehavior.IGNORE) {
@@ -246,20 +300,16 @@ public class SchemaRegistryRequestHandler implements Closeable {
                 }
             }
             if (!metadataApplier.acceptsSchemaEvolutionType(changeEvent.getType())) {
-                LOG.info("Ignored schema change {} to table {}.", changeEvent, tableId);
+                LOG.info("Ignored schema change {}.", changeEvent);
                 currentIgnoredSchemaChanges.add(changeEvent);
             } else {
                 try {
                     metadataApplier.applySchemaChange(changeEvent);
-                    LOG.info("Applied schema change {} to table {}.", changeEvent, tableId);
+                    LOG.info("Applied schema change {}.", changeEvent);
                     schemaManager.applyEvolvedSchemaChange(changeEvent);
                     currentFinishedSchemaChanges.add(changeEvent);
                 } catch (Throwable t) {
-                    LOG.error(
-                            "Failed to apply schema change {} to table {}. Caused by: {}",
-                            changeEvent,
-                            tableId,
-                            t);
+                    LOG.error("Failed to apply schema change {}. Caused by: {}", changeEvent, t);
                     if (!shouldIgnoreException(t)) {
                         currentChangeException = t;
                         break;
@@ -298,7 +348,19 @@ public class SchemaRegistryRequestHandler implements Closeable {
      * @param tableId the subtask in SchemaOperator and table that the FlushEvent is about
      * @param sinkSubtask the sink subtask succeed flushing
      */
-    public void flushSuccess(TableId tableId, int sinkSubtask, int parallelism) {
+    public void flushSuccess(TableId tableId, int sinkSubtask, long versionCode, int parallelism) {
+        long currentVersion = currentSchemaChangeVersion.get();
+        if (versionCode < currentVersion) {
+            LOG.warn(
+                    "Schema registry received a stale flush success event (version {}), since current version is already {}. Ignoring it.",
+                    versionCode,
+                    currentVersion);
+        } else if (versionCode > currentVersion) {
+            throw new IllegalStateException(
+                    String.format(
+                            "Schema registry received a flush success event with newer version code %d. Current version: %d. This should never happen.",
+                            versionCode, currentVersion));
+        }
         flushedSinkWriters.add(sinkSubtask);
         if (activeSinkWriters.size() < parallelism) {
             LOG.info(
@@ -315,10 +377,8 @@ public class SchemaRegistryRequestHandler implements Closeable {
 
             schemaChangeStatus = RequestStatus.APPLYING;
             LOG.info(
-                    "All sink subtask have flushed for table {}. Start to apply schema change.",
+                    "All sink subtasks have flushed for table {}. State switched from WAITING_FOR_FLUSH to APPLYING.",
                     tableId.toString());
-            schemaChangeThreadPool.submit(
-                    () -> applySchemaChange(tableId, currentDerivedSchemaChangeEvents));
         }
     }
 

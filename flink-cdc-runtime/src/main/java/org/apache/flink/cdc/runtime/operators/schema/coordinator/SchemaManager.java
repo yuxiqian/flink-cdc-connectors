@@ -68,10 +68,10 @@ public class SchemaManager {
     public static final Serializer SERIALIZER = new Serializer();
 
     // Schema management
-    private final Map<TableId, SortedMap<Integer, Schema>> originalSchemas;
+    public final Map<TableId, SortedMap<Integer, Schema>> originalSchemas; // TODO: REVERT THIS
 
     // Schema management
-    private final Map<TableId, SortedMap<Integer, Schema>> evolvedSchemas;
+    public final Map<TableId, SortedMap<Integer, Schema>> evolvedSchemas; // TODO: REVERT THIS
 
     public SchemaManager() {
         evolvedSchemas = new HashMap<>();

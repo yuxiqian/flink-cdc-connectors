@@ -60,9 +60,11 @@ public class SchemaEvolutionClient {
     }
 
     /** send {@link FlushSuccessEvent} to {@link SchemaRegistry}. */
-    public void notifyFlushSuccess(int subtask, TableId tableId) throws IOException {
+    public void notifyFlushSuccess(int subtask, TableId tableId, long versionCode)
+            throws IOException {
         toCoordinator.sendOperatorEventToCoordinator(
-                schemaOperatorID, new SerializedValue<>(new FlushSuccessEvent(subtask, tableId)));
+                schemaOperatorID,
+                new SerializedValue<>(new FlushSuccessEvent(subtask, tableId, versionCode)));
     }
 
     public Optional<Schema> getLatestEvolvedSchema(TableId tableId) throws Exception {

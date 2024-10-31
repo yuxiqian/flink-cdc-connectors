@@ -36,9 +36,16 @@ public class FlushSuccessEvent implements OperatorEvent {
     /** The schema changes from which table is executing it. */
     private final TableId tableId;
 
-    public FlushSuccessEvent(int subtask, TableId tableId) {
+    /**
+     * The schema evolution version code that increases for each schema change request. Used for
+     * distinguishing FlushEvents triggered by different schema change events.
+     */
+    private final long versionCode;
+
+    public FlushSuccessEvent(int subtask, TableId tableId, long versionCode) {
         this.subtask = subtask;
         this.tableId = tableId;
+        this.versionCode = versionCode;
     }
 
     public int getSubtask() {
@@ -47,6 +54,10 @@ public class FlushSuccessEvent implements OperatorEvent {
 
     public TableId getTableId() {
         return tableId;
+    }
+
+    public long getVersionCode() {
+        return versionCode;
     }
 
     @Override
@@ -58,11 +69,13 @@ public class FlushSuccessEvent implements OperatorEvent {
             return false;
         }
         FlushSuccessEvent that = (FlushSuccessEvent) o;
-        return subtask == that.subtask && Objects.equals(tableId, that.tableId);
+        return subtask == that.subtask
+                && Objects.equals(tableId, that.tableId)
+                && Objects.equals(versionCode, that.versionCode);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(subtask, tableId);
+        return Objects.hash(subtask, tableId, versionCode);
     }
 }

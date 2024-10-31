@@ -41,12 +41,8 @@ public class SchemaChangeResponse implements CoordinationResponse {
 
     private final ResponseCode responseCode;
 
-    public static SchemaChangeResponse accepted(List<SchemaChangeEvent> schemaChangeEvents) {
-        return new SchemaChangeResponse(schemaChangeEvents, ResponseCode.ACCEPTED);
-    }
-
-    public static SchemaChangeResponse busy() {
-        return new SchemaChangeResponse(Collections.emptyList(), ResponseCode.BUSY);
+    public static SchemaChangeResponse evolved(List<SchemaChangeEvent> schemaChangeEvents) {
+        return new SchemaChangeResponse(schemaChangeEvents, ResponseCode.EVOLVED);
     }
 
     public static SchemaChangeResponse duplicate() {
@@ -63,12 +59,8 @@ public class SchemaChangeResponse implements CoordinationResponse {
         this.responseCode = responseCode;
     }
 
-    public boolean isAccepted() {
-        return ResponseCode.ACCEPTED.equals(responseCode);
-    }
-
-    public boolean isRegistryBusy() {
-        return ResponseCode.BUSY.equals(responseCode);
+    public boolean isEvolved() {
+        return ResponseCode.EVOLVED.equals(responseCode);
     }
 
     public boolean isDuplicate() {
@@ -126,8 +118,7 @@ public class SchemaChangeResponse implements CoordinationResponse {
      * required. Possibly caused by LENIENT mode or merging table strategies.
      */
     public enum ResponseCode {
-        ACCEPTED,
-        BUSY,
+        EVOLVED,
         DUPLICATE,
         IGNORED
     }
