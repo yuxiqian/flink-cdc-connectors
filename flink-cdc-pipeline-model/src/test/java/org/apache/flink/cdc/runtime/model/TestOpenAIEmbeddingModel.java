@@ -21,7 +21,7 @@ import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.data.ArrayData;
 import org.apache.flink.cdc.common.udf.UserDefinedFunctionContext;
 
-import org.junit.jupiter.api.Assertions;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
@@ -40,6 +40,6 @@ public class TestOpenAIEmbeddingModel {
         openAIEmbeddingModel.open(userDefinedFunctionContext);
         ArrayData arrayData =
                 openAIEmbeddingModel.eval("Flink CDC is a streaming data integration tool");
-        Assertions.assertNotNull(arrayData);
+        Assertions.assertThat(arrayData).isNotNull();
     }
 }

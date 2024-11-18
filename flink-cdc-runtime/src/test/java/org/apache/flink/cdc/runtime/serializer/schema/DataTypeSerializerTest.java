@@ -41,7 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /** A test for the {@link DataTypeSerializer}. */
-public class DataTypeSerializerTest extends SerializerTestBase<DataType> {
+class DataTypeSerializerTest extends SerializerTestBase<DataType> {
 
     private static final Logger LOG = LoggerFactory.getLogger(DataTypeSerializerTest.class);
 
