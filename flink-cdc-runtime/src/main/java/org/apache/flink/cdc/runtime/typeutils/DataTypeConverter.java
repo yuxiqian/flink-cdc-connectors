@@ -22,13 +22,10 @@ import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.schema.Column;
-import org.apache.flink.cdc.common.types.BinaryType;
-import org.apache.flink.cdc.common.types.DataType;
-import org.apache.flink.cdc.common.types.DataTypes;
-import org.apache.flink.cdc.common.types.RowType;
-import org.apache.flink.cdc.common.types.VarBinaryType;
+import org.apache.flink.cdc.common.types.*;
 
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.type.SqlTypeName;
 
 import java.math.BigDecimal;
@@ -96,42 +93,197 @@ public class DataTypeConverter {
         }
     }
 
-    public static SqlTypeName convertCalciteType(DataType dataType) {
+    public static RelDataType convertCalciteRelDataType(
+            RelDataTypeFactory relDataTypeFactory, List<Column> columns) {
+        RelDataTypeFactory.Builder fieldInfoBuilder = relDataTypeFactory.builder();
+        for (Column column : columns) {
+            switch (column.getType().getTypeRoot()) {
+                case BOOLEAN:
+                    BooleanType booleanType = (BooleanType) column.getType();
+                    fieldInfoBuilder
+                            .add(column.getName(), SqlTypeName.BOOLEAN)
+                            .nullable(booleanType.isNullable());
+                    break;
+                case TINYINT:
+                    TinyIntType tinyIntType = (TinyIntType) column.getType();
+                    fieldInfoBuilder
+                            .add(column.getName(), SqlTypeName.TINYINT)
+                            .nullable(tinyIntType.isNullable());
+                    break;
+                case SMALLINT:
+                    SmallIntType smallIntType = (SmallIntType) column.getType();
+                    fieldInfoBuilder
+                            .add(column.getName(), SqlTypeName.SMALLINT)
+                            .nullable(smallIntType.isNullable());
+                    break;
+                case INTEGER:
+                    IntType intType = (IntType) column.getType();
+                    fieldInfoBuilder
+                            .add(column.getName(), SqlTypeName.INTEGER)
+                            .nullable(intType.isNullable());
+                    break;
+                case BIGINT:
+                    BigIntType bigIntType = (BigIntType) column.getType();
+                    fieldInfoBuilder
+                            .add(column.getName(), SqlTypeName.BIGINT)
+                            .nullable(bigIntType.isNullable());
+                    break;
+                case DATE:
+                    DateType dateType = (DateType) column.getType();
+                    fieldInfoBuilder
+                            .add(column.getName(), SqlTypeName.DATE)
+                            .nullable(dateType.isNullable());
+                    break;
+                case TIME_WITHOUT_TIME_ZONE:
+                    TimeType timeType = (TimeType) column.getType();
+                    fieldInfoBuilder
+                            .add(
+                                    column.getName(),
+                                    SqlTypeName.TIME_WITH_LOCAL_TIME_ZONE,
+                                    timeType.getPrecision())
+                            .nullable(timeType.isNullable());
+                    break;
+                case TIMESTAMP_WITHOUT_TIME_ZONE:
+                    TimestampType timestampType = (TimestampType) column.getType();
+                    fieldInfoBuilder
+                            .add(
+                                    column.getName(),
+                                    SqlTypeName.TIMESTAMP,
+                                    timestampType.getPrecision())
+                            .nullable(timestampType.isNullable());
+                    break;
+                case TIMESTAMP_WITH_TIME_ZONE:
+                    ZonedTimestampType zonedTimestampType = (ZonedTimestampType) column.getType();
+                    fieldInfoBuilder
+                            .add(
+                                    column.getName(),
+                                    SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE,
+                                    zonedTimestampType.getPrecision())
+                            .nullable(zonedTimestampType.isNullable());
+                    break;
+                case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+                    LocalZonedTimestampType localZonedTimestampType =
+                            (LocalZonedTimestampType) column.getType();
+                    fieldInfoBuilder
+                            .add(
+                                    column.getName(),
+                                    SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE,
+                                    localZonedTimestampType.getPrecision())
+                            .nullable(localZonedTimestampType.isNullable());
+                    break;
+                case FLOAT:
+                    FloatType floatType = (FloatType) column.getType();
+                    fieldInfoBuilder
+                            .add(column.getName(), SqlTypeName.FLOAT)
+                            .nullable(floatType.isNullable());
+                    break;
+                case DOUBLE:
+                    DoubleType doubleType = (DoubleType) column.getType();
+                    fieldInfoBuilder
+                            .add(column.getName(), SqlTypeName.DOUBLE)
+                            .nullable(doubleType.isNullable());
+                    break;
+                case CHAR:
+                    CharType charType = (CharType) column.getType();
+                    fieldInfoBuilder
+                            .add(column.getName(), SqlTypeName.CHAR, charType.getLength())
+                            .nullable(charType.isNullable());
+                    break;
+                case VARCHAR:
+                    VarCharType varCharType = (VarCharType) column.getType();
+                    fieldInfoBuilder
+                            .add(column.getName(), SqlTypeName.VARCHAR, varCharType.getLength())
+                            .nullable(varCharType.isNullable());
+                    break;
+                case BINARY:
+                    BinaryType binaryType = (BinaryType) column.getType();
+                    fieldInfoBuilder
+                            .add(column.getName(), SqlTypeName.BINARY, binaryType.getLength())
+                            .nullable(binaryType.isNullable());
+                    break;
+                case VARBINARY:
+                    VarBinaryType varBinaryType = (VarBinaryType) column.getType();
+                    fieldInfoBuilder
+                            .add(column.getName(), SqlTypeName.VARBINARY)
+                            .nullable(varBinaryType.isNullable());
+                    break;
+                case DECIMAL:
+                    DecimalType decimalType = (DecimalType) column.getType();
+                    fieldInfoBuilder
+                            .add(
+                                    column.getName(),
+                                    SqlTypeName.DECIMAL,
+                                    decimalType.getPrecision(),
+                                    decimalType.getScale())
+                            .nullable(decimalType.isNullable());
+                    break;
+                case ROW:
+                case ARRAY:
+                case MAP:
+                default:
+                    throw new UnsupportedOperationException(
+                            "Unsupported type: " + column.getType());
+            }
+        }
+        return fieldInfoBuilder.build();
+    }
+
+    public static RelDataType convertCalciteType(
+            RelDataTypeFactory relDataTypeFactory, DataType dataType) {
         switch (dataType.getTypeRoot()) {
             case BOOLEAN:
-                return SqlTypeName.BOOLEAN;
+                return relDataTypeFactory.createSqlType(SqlTypeName.BOOLEAN);
             case TINYINT:
-                return SqlTypeName.TINYINT;
+                return relDataTypeFactory.createSqlType(SqlTypeName.TINYINT);
             case SMALLINT:
-                return SqlTypeName.SMALLINT;
+                return relDataTypeFactory.createSqlType(SqlTypeName.SMALLINT);
             case INTEGER:
-                return SqlTypeName.INTEGER;
+                return relDataTypeFactory.createSqlType(SqlTypeName.INTEGER);
             case BIGINT:
-                return SqlTypeName.BIGINT;
+                return relDataTypeFactory.createSqlType(SqlTypeName.BIGINT);
             case DATE:
-                return SqlTypeName.DATE;
+                return relDataTypeFactory.createSqlType(SqlTypeName.DATE);
             case TIME_WITHOUT_TIME_ZONE:
-                return SqlTypeName.TIME_WITH_LOCAL_TIME_ZONE;
+                TimeType timeType = (TimeType) dataType;
+                return relDataTypeFactory.createSqlType(
+                        SqlTypeName.TIME_WITH_LOCAL_TIME_ZONE, timeType.getPrecision());
             case TIMESTAMP_WITHOUT_TIME_ZONE:
-                return SqlTypeName.TIMESTAMP;
+                TimestampType timestampType = (TimestampType) dataType;
+                return relDataTypeFactory.createSqlType(
+                        SqlTypeName.TIMESTAMP, timestampType.getPrecision());
+            case TIMESTAMP_WITH_TIME_ZONE:
+                ZonedTimestampType zonedTimestampType = (ZonedTimestampType) dataType;
+                return relDataTypeFactory.createSqlType(
+                        SqlTypeName.TIMESTAMP, zonedTimestampType.getPrecision());
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-                return SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE;
+                LocalZonedTimestampType localZonedTimestampType =
+                        (LocalZonedTimestampType) dataType;
+                return relDataTypeFactory.createSqlType(
+                        SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE,
+                        localZonedTimestampType.getPrecision());
             case FLOAT:
-                return SqlTypeName.FLOAT;
+                return relDataTypeFactory.createSqlType(SqlTypeName.FLOAT);
             case DOUBLE:
-                return SqlTypeName.DOUBLE;
+                return relDataTypeFactory.createSqlType(SqlTypeName.DOUBLE);
             case CHAR:
-                return SqlTypeName.CHAR;
+                CharType charType = (CharType) dataType;
+                return relDataTypeFactory.createSqlType(SqlTypeName.CHAR, charType.getLength());
             case VARCHAR:
-                return SqlTypeName.VARCHAR;
+                VarCharType varCharType = (VarCharType) dataType;
+                return relDataTypeFactory.createSqlType(
+                        SqlTypeName.VARCHAR, varCharType.getLength());
             case BINARY:
-                return SqlTypeName.BINARY;
+                BinaryType binaryType = (BinaryType) dataType;
+                return relDataTypeFactory.createSqlType(SqlTypeName.BINARY, binaryType.getLength());
             case VARBINARY:
-                return SqlTypeName.VARBINARY;
+                VarBinaryType varBinaryType = (VarBinaryType) dataType;
+                return relDataTypeFactory.createSqlType(
+                        SqlTypeName.VARBINARY, varBinaryType.getLength());
             case DECIMAL:
-                return SqlTypeName.DECIMAL;
+                DecimalType decimalType = (DecimalType) dataType;
+                return relDataTypeFactory.createSqlType(
+                        SqlTypeName.DECIMAL, decimalType.getPrecision(), decimalType.getScale());
             case ROW:
-                return SqlTypeName.ROW;
             case ARRAY:
             case MAP:
             default:

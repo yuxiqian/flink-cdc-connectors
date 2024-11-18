@@ -123,10 +123,7 @@ public class TransformParser {
                 if (udf.getReturnTypeHint() != null) {
                     // This UDF has return type hint annotation
                     returnTypeInference =
-                            o ->
-                                    o.getTypeFactory()
-                                            .createSqlType(
-                                                    convertCalciteType(udf.getReturnTypeHint()));
+                            o -> convertCalciteType(o.getTypeFactory(), udf.getReturnTypeHint());
                 } else {
                     // Infer it from eval method return type
                     returnTypeInference = o -> function.getReturnType(o.getTypeFactory());
@@ -169,8 +166,8 @@ public class TransformParser {
                                 new HepPlanner(new HepProgramBuilder().build()),
                                 new RexBuilder(factory)),
                         StandardConvertletTable.INSTANCE,
-                        SqlToRelConverter.config().withTrimUnusedFields(false));
-        RelRoot relRoot = sqlToRelConverter.convertQuery(validateSqlNode, false, true);
+                        SqlToRelConverter.config().withTrimUnusedFields(true));
+        RelRoot relRoot = sqlToRelConverter.convertQuery(validateSqlNode, false, false);
         return relRoot.rel;
     }
 
