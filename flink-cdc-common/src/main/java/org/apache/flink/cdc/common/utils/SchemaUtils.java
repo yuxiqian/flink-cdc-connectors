@@ -285,6 +285,7 @@ public class SchemaUtils {
                 createTableEvent -> createTableEvent.getSchema(),
                 dropColumnEvent -> applyDropColumnEvent(dropColumnEvent, schema),
                 dropTableEvent -> schema,
+                emplaceTableSchemaEvent -> emplaceTableSchemaEvent.getSchema(),
                 renameColumnEvent -> applyRenameColumnEvent(renameColumnEvent, schema),
                 truncateTableEvent -> schema);
     }

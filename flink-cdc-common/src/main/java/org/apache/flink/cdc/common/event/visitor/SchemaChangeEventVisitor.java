@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
+import org.apache.flink.cdc.common.event.EmplaceTableSchemaEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
@@ -37,6 +38,7 @@ public class SchemaChangeEventVisitor {
             CreateTableEventVisitor<T, E> createTableEventVisitor,
             DropColumnEventVisitor<T, E> dropColumnEventVisitor,
             DropTableEventVisitor<T, E> dropTableEventVisitor,
+            EmplaceTableSchemaEventVisitor<T, E> emplaceTableSchemaEventVisitor,
             RenameColumnEventVisitor<T, E> renameColumnEventVisitor,
             TruncateTableEventVisitor<T, E> truncateTableEventVisitor)
             throws E {
@@ -65,6 +67,11 @@ public class SchemaChangeEventVisitor {
                 return null;
             }
             return dropTableEventVisitor.visit((DropTableEvent) event);
+        } else if (event instanceof EmplaceTableSchemaEvent) {
+            if (emplaceTableSchemaEventVisitor == null) {
+                return null;
+            }
+            return emplaceTableSchemaEventVisitor.visit((EmplaceTableSchemaEvent) event);
         } else if (event instanceof RenameColumnEvent) {
             if (renameColumnEventVisitor == null) {
                 return null;

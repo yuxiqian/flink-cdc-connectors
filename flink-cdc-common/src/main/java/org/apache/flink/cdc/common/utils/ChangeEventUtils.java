@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
+import org.apache.flink.cdc.common.event.EmplaceTableSchemaEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
@@ -81,6 +82,8 @@ public class ChangeEventUtils {
                 dropColumnEvent ->
                         new DropColumnEvent(tableId, dropColumnEvent.getDroppedColumnNames()),
                 dropTableEvent -> new DropTableEvent(tableId),
+                emplaceTableSchemaEvent ->
+                        new EmplaceTableSchemaEvent(tableId, emplaceTableSchemaEvent.getSchema()),
                 renameColumnEvent ->
                         new RenameColumnEvent(tableId, renameColumnEvent.getNameMapping()),
                 truncateTableEvent -> new TruncateTableEvent(tableId));

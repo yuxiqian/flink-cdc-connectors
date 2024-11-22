@@ -84,7 +84,7 @@ public class SchemaRegistryProvider implements OperatorCoordinator.Provider {
 
         private Thread t;
 
-        CoordinatorExecutorThreadFactory(
+        public CoordinatorExecutorThreadFactory(
                 final String coordinatorThreadName, final ClassLoader contextClassLoader) {
             this(coordinatorThreadName, contextClassLoader, FatalExitExceptionHandler.INSTANCE);
         }

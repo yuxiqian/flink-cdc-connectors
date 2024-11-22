@@ -138,6 +138,13 @@ public class SchemaDerivation {
                                                 Collections.emptyList(), // Table drop shouldn't be
                                         // spread to route
                                         // destination.
+
+                                        emplaceTableSchemaEvent -> {
+                                            throw new IllegalStateException(
+                                                    "Emplace table schema event "
+                                                            + emplaceTableSchemaEvent
+                                                            + " shouldn't be presented in SchemaDerivation context.");
+                                        },
                                         renameColumnEvent ->
                                                 handleRenameColumnEvent(
                                                         renameColumnEvent,

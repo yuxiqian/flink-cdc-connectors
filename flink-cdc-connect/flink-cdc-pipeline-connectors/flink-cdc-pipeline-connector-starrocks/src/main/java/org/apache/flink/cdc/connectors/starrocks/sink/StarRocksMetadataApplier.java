@@ -119,6 +119,9 @@ public class StarRocksMetadataApplier implements MetadataApplier {
                 dropTableEvent -> {
                     throw new UnsupportedSchemaChangeEventException(dropTableEvent);
                 },
+                emplaceTableSchemaEvent -> {
+                    throw new UnsupportedSchemaChangeEventException(emplaceTableSchemaEvent);
+                },
                 renameColumnEvent -> {
                     applyRenameColumn(renameColumnEvent);
                     return null;

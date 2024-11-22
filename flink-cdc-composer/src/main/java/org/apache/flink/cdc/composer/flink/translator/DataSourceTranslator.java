@@ -35,9 +35,13 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
+import java.util.Objects;
+
 /** Translator used to build {@link DataSource} which will generate a {@link DataStream}. */
 @Internal
 public class DataSourceTranslator {
+
+    private Boolean needsSchemaInferencing;
 
     public DataStreamSource<Event> translate(
             SourceDef sourceDef,
@@ -46,6 +50,7 @@ public class DataSourceTranslator {
             int sourceParallelism) {
         // Create data source
         DataSource dataSource = createDataSource(sourceDef, env, pipelineConfig);
+        needsSchemaInferencing = dataSource.needsSchemaInferencing();
 
         // Get source provider
         EventSourceProvider eventSourceProvider = dataSource.getEventSourceProvider();
@@ -98,5 +103,11 @@ public class DataSourceTranslator {
 
     private String generateDefaultSourceName(SourceDef sourceDef) {
         return String.format("Flink CDC Event Source: %s", sourceDef.getType());
+    }
+
+    public boolean needsSchemaInferencing() {
+        return Objects.requireNonNull(
+                needsSchemaInferencing,
+                "This method could only be accessed after source being translated.");
     }
 }

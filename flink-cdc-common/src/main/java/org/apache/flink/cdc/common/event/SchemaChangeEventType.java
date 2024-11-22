@@ -27,6 +27,7 @@ public enum SchemaChangeEventType {
     CREATE_TABLE("create.table"),
     DROP_COLUMN("drop.column"),
     DROP_TABLE("drop.table"),
+    EMPLACE_SCHEMA("emplace.schema"),
     RENAME_COLUMN("rename.column"),
     TRUNCATE_TABLE("truncate.table");
 
@@ -51,6 +52,8 @@ public enum SchemaChangeEventType {
             return DROP_COLUMN;
         } else if (event instanceof DropTableEvent) {
             return DROP_TABLE;
+        } else if (event instanceof EmplaceTableSchemaEvent) {
+            return EMPLACE_SCHEMA;
         } else if (event instanceof RenameColumnEvent) {
             return RENAME_COLUMN;
         } else if (event instanceof TruncateTableEvent) {
@@ -72,6 +75,8 @@ public enum SchemaChangeEventType {
                 return DROP_COLUMN;
             case "drop.table":
                 return DROP_TABLE;
+            case "emplace.schema":
+                return EMPLACE_SCHEMA;
             case "rename.column":
                 return RENAME_COLUMN;
             case "truncate.table":

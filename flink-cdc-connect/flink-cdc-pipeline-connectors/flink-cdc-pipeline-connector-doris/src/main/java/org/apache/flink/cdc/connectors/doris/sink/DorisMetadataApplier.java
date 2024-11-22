@@ -119,6 +119,9 @@ public class DorisMetadataApplier implements MetadataApplier {
                 dropTableEvent -> {
                     throw new UnsupportedSchemaChangeEventException(event);
                 },
+                emplaceTableSchemaEvent -> {
+                    throw new UnsupportedSchemaChangeEventException(event);
+                },
                 renameColumnEvent -> {
                     applyRenameColumnEvent(renameColumnEvent);
                     return null;

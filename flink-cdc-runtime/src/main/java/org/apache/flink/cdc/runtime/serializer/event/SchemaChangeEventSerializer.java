@@ -36,6 +36,7 @@ import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ALTER_COLU
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.CREATE_TABLE;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_COLUMN;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_TABLE;
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.EMPLACE_SCHEMA;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.RENAME_COLUMN;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.TRUNCATE_TABLE;
 
@@ -79,6 +80,7 @@ public final class SchemaChangeEventSerializer extends TypeSerializerSingleton<S
                 CreateTableEventSerializer.INSTANCE::copy,
                 DropColumnEventSerializer.INSTANCE::copy,
                 DropTableEventSerializer.INSTANCE::copy,
+                EmplaceTableSchemaEventSerializer.INSTANCE::copy,
                 RenameColumnEventSerializer.INSTANCE::copy,
                 TruncateTableEventSerializer.INSTANCE::copy);
     }
@@ -123,6 +125,12 @@ public final class SchemaChangeEventSerializer extends TypeSerializerSingleton<S
                     DropTableEventSerializer.INSTANCE.serialize(dropTableEvent, target);
                     return null;
                 },
+                emplaceTableSchemaEvent -> {
+                    enumSerializer.serialize(EMPLACE_SCHEMA, target);
+                    EmplaceTableSchemaEventSerializer.INSTANCE.serialize(
+                            emplaceTableSchemaEvent, target);
+                    return null;
+                },
                 renameColumnEvent -> {
                     enumSerializer.serialize(RENAME_COLUMN, target);
                     RenameColumnEventSerializer.INSTANCE.serialize(renameColumnEvent, target);
@@ -141,16 +149,18 @@ public final class SchemaChangeEventSerializer extends TypeSerializerSingleton<S
         switch (schemaChangeEventType) {
             case ADD_COLUMN:
                 return AddColumnEventSerializer.INSTANCE.deserialize(source);
-            case DROP_COLUMN:
-                return DropColumnEventSerializer.INSTANCE.deserialize(source);
-            case CREATE_TABLE:
-                return CreateTableEventSerializer.INSTANCE.deserialize(source);
-            case RENAME_COLUMN:
-                return RenameColumnEventSerializer.INSTANCE.deserialize(source);
             case ALTER_COLUMN_TYPE:
                 return AlterColumnTypeEventSerializer.INSTANCE.deserialize(source);
+            case CREATE_TABLE:
+                return CreateTableEventSerializer.INSTANCE.deserialize(source);
+            case DROP_COLUMN:
+                return DropColumnEventSerializer.INSTANCE.deserialize(source);
             case DROP_TABLE:
                 return DropTableEventSerializer.INSTANCE.deserialize(source);
+            case EMPLACE_SCHEMA:
+                return EmplaceTableSchemaEventSerializer.INSTANCE.deserialize(source);
+            case RENAME_COLUMN:
+                return RenameColumnEventSerializer.INSTANCE.deserialize(source);
             case TRUNCATE_TABLE:
                 return TruncateTableEventSerializer.INSTANCE.deserialize(source);
             default:

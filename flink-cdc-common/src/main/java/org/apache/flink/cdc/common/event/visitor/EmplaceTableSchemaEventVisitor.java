@@ -15,32 +15,14 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.connectors.stimps.source;
+package org.apache.flink.cdc.common.event.visitor;
 
 import org.apache.flink.cdc.common.annotation.Internal;
-import org.apache.flink.cdc.common.source.DataSource;
-import org.apache.flink.cdc.common.source.EventSourceProvider;
-import org.apache.flink.cdc.common.source.FlinkSourceFunctionProvider;
-import org.apache.flink.cdc.common.source.MetadataAccessor;
+import org.apache.flink.cdc.common.event.EmplaceTableSchemaEvent;
 
-/**
- * A {@link DataSource} for "stimps" connector that tests single-table-in-multi-partition scenario.
- */
+/** Visitor for {@link EmplaceTableSchemaEvent}s. */
 @Internal
-public class StimpsDataSource implements DataSource {
-
-    @Override
-    public EventSourceProvider getEventSourceProvider() {
-        return FlinkSourceFunctionProvider.of(new StimpsSourceFunction());
-    }
-
-    @Override
-    public MetadataAccessor getMetadataAccessor() {
-        throw new UnsupportedOperationException("Stimps doesn't need a metadata accessor!");
-    }
-
-    @Override
-    public boolean needsSchemaInferencing() {
-        return true;
-    }
+@FunctionalInterface
+public interface EmplaceTableSchemaEventVisitor<T, E extends Throwable> {
+    T visit(EmplaceTableSchemaEvent event) throws E;
 }

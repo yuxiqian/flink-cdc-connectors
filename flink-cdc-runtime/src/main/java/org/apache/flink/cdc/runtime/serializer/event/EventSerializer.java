@@ -21,6 +21,7 @@ import org.apache.flink.api.common.typeutils.SimpleTypeSerializerSnapshot;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.event.DataChangeEventWithSchema;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
@@ -47,6 +48,8 @@ public final class EventSerializer extends TypeSerializerSingleton<Event> {
             new EnumSerializer<>(EventClass.class);
     private final TypeSerializer<DataChangeEvent> dataChangeEventSerializer =
             DataChangeEventSerializer.INSTANCE;
+    private final TypeSerializer<DataChangeEventWithSchema> dataChangeEventWithSchemaSerializer =
+            DataChangeEventWithSchemaSerializer.INSTANCE;
 
     @Override
     public boolean isImmutableType() {
@@ -66,8 +69,11 @@ public final class EventSerializer extends TypeSerializerSingleton<Event> {
             return schemaChangeEventSerializer.copy((SchemaChangeEvent) from);
         } else if (from instanceof DataChangeEvent) {
             return dataChangeEventSerializer.copy((DataChangeEvent) from);
+        } else if (from instanceof DataChangeEventWithSchema) {
+            return dataChangeEventWithSchemaSerializer.copy((DataChangeEventWithSchema) from);
+        } else {
+            throw new UnsupportedOperationException("Unknown event type: " + from.toString());
         }
-        throw new UnsupportedOperationException("Unknown event type: " + from.toString());
     }
 
     @Override
@@ -91,6 +97,10 @@ public final class EventSerializer extends TypeSerializerSingleton<Event> {
         } else if (record instanceof DataChangeEvent) {
             enumSerializer.serialize(EventClass.DATA_CHANGE_EVENT, target);
             dataChangeEventSerializer.serialize((DataChangeEvent) record, target);
+        } else if (record instanceof DataChangeEventWithSchema) {
+            enumSerializer.serialize(EventClass.DATA_CHANGE_EVENT_WITH_SCHEMA, target);
+            dataChangeEventWithSchemaSerializer.serialize(
+                    (DataChangeEventWithSchema) record, target);
         } else {
             throw new UnsupportedOperationException("Unknown event type: " + record.toString());
         }
@@ -106,6 +116,8 @@ public final class EventSerializer extends TypeSerializerSingleton<Event> {
                 return dataChangeEventSerializer.deserialize(source);
             case SCHEME_CHANGE_EVENT:
                 return schemaChangeEventSerializer.deserialize(source);
+            case DATA_CHANGE_EVENT_WITH_SCHEMA:
+                return dataChangeEventWithSchemaSerializer.deserialize(source);
             default:
                 throw new UnsupportedOperationException("Unknown event type: " + eventClass);
         }
@@ -138,6 +150,7 @@ public final class EventSerializer extends TypeSerializerSingleton<Event> {
     enum EventClass {
         DATA_CHANGE_EVENT,
         SCHEME_CHANGE_EVENT,
-        FLUSH_EVENT
+        FLUSH_EVENT,
+        DATA_CHANGE_EVENT_WITH_SCHEMA
     }
 }

@@ -42,12 +42,15 @@ public class PartitioningTranslator {
             int upstreamParallelism,
             int downstreamParallelism,
             OperatorID schemaOperatorID,
-            HashFunctionProvider<DataChangeEvent> hashFunctionProvider) {
+            HashFunctionProvider<DataChangeEvent> hashFunctionProvider,
+            boolean needsSchemaInferencing) {
         return input.transform(
                         "PrePartition",
                         new PartitioningEventTypeInfo(),
                         new PrePartitionOperator(
-                                schemaOperatorID, downstreamParallelism, hashFunctionProvider))
+                                downstreamParallelism,
+                                hashFunctionProvider,
+                                needsSchemaInferencing))
                 .setParallelism(upstreamParallelism)
                 .partitionCustom(new EventPartitioner(), new PartitioningEventKeySelector())
                 .map(new PostPartitionProcessor(), new EventTypeInfo())

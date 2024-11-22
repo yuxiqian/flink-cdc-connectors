@@ -31,4 +31,9 @@ public interface DataSource {
 
     /** Get the {@link MetadataAccessor} for accessing metadata from external systems. */
     MetadataAccessor getMetadataAccessor();
+
+    /** Whether this source needs schema inference. */
+    default boolean needsSchemaInferencing() {
+        return false;
+    }
 }
