@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.event.EmplaceTableSchemaEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
@@ -62,6 +63,10 @@ public class ValuesDataSinkFunction implements SinkFunction<Event> {
             TableId tableId = schemaChangeEvent.tableId();
             if (event instanceof CreateTableEvent) {
                 Schema schema = ((CreateTableEvent) event).getSchema();
+                schemaMaps.put(tableId, schema);
+                fieldGetterMaps.put(tableId, SchemaUtils.createFieldGetters(schema));
+            } else if (event instanceof EmplaceTableSchemaEvent) {
+                Schema schema = ((EmplaceTableSchemaEvent) event).getSchema();
                 schemaMaps.put(tableId, schema);
                 fieldGetterMaps.put(tableId, SchemaUtils.createFieldGetters(schema));
             } else {

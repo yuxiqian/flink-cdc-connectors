@@ -29,10 +29,8 @@ import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.runtime.serializer.SerializerTestBase;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 
-import javax.xml.crypto.Data;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /** A test for the {@link DataChangeEventSerializer}. */
@@ -58,11 +56,12 @@ public class DataChangeEventWithSchemaSerializerTest
         Map<String, String> meta = new HashMap<>();
         meta.put("option", "meta1");
 
-        Schema schema = Schema.newBuilder()
-                .physicalColumn("id", DataTypes.BIGINT())
-                .physicalColumn("name", DataTypes.STRING())
-                .physicalColumn("extras", DataTypes.STRING())
-                .build();
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .physicalColumn("extras", DataTypes.STRING())
+                        .build();
         BinaryRecordDataGenerator generator =
                 new BinaryRecordDataGenerator(
                         RowType.of(DataTypes.BIGINT(), DataTypes.STRING(), DataTypes.STRING()));
@@ -77,16 +76,21 @@ public class DataChangeEventWithSchemaSerializerTest
                 generator.generate(
                         new Object[] {1L, null, BinaryStringData.fromString("updateComment")});
         return Stream.of(
-                DataChangeEvent.insertEvent(TableId.tableId("table"), after),
-                DataChangeEvent.insertEvent(TableId.tableId("table"), after, meta),
-                DataChangeEvent.replaceEvent(TableId.tableId("schema", "table"), after),
-                DataChangeEvent.replaceEvent(TableId.tableId("schema", "table"), after, meta),
-                DataChangeEvent.deleteEvent(TableId.tableId("table"), before),
-                DataChangeEvent.deleteEvent(TableId.tableId("table"), before, meta),
-                DataChangeEvent.updateEvent(
-                        TableId.tableId("namespace", "schema", "table"), before, after),
-                DataChangeEvent.updateEvent(
-                        TableId.tableId("namespace", "schema", "table"), before, after, meta)
-        ).map(evt -> new DataChangeEventWithSchema(schema, evt)).toArray(DataChangeEventWithSchema[]::new);
+                        DataChangeEvent.insertEvent(TableId.tableId("table"), after),
+                        DataChangeEvent.insertEvent(TableId.tableId("table"), after, meta),
+                        DataChangeEvent.replaceEvent(TableId.tableId("schema", "table"), after),
+                        DataChangeEvent.replaceEvent(
+                                TableId.tableId("schema", "table"), after, meta),
+                        DataChangeEvent.deleteEvent(TableId.tableId("table"), before),
+                        DataChangeEvent.deleteEvent(TableId.tableId("table"), before, meta),
+                        DataChangeEvent.updateEvent(
+                                TableId.tableId("namespace", "schema", "table"), before, after),
+                        DataChangeEvent.updateEvent(
+                                TableId.tableId("namespace", "schema", "table"),
+                                before,
+                                after,
+                                meta))
+                .map(evt -> new DataChangeEventWithSchema(schema, evt))
+                .toArray(DataChangeEventWithSchema[]::new);
     }
 }

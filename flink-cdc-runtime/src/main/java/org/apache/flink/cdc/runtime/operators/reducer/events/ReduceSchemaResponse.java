@@ -17,45 +17,48 @@
 
 package org.apache.flink.cdc.runtime.operators.reducer.events;
 
-import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.runtime.operators.reducer.SchemaMapper;
-import org.apache.flink.runtime.operators.coordination.OperatorEvent;
+import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.runtime.operators.reducer.SchemaReducer;
+import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 
 import java.util.Objects;
 
-/**
- * A {@link OperatorEvent} from schema reducer to notify {@link SchemaMapper} that it should emit
- * {@link FlushEvent} to downstream sink writer.
- */
-public class RequestEmitFlushEvent implements OperatorEvent {
-    private static final long serialVersionUID = 1L;
+/** Mapper's request to {@link SchemaReducer} for reducing an incompatible schema. */
+public class ReduceSchemaResponse implements CoordinationResponse {
 
-    /** The schema changes from which table is executing it. */
     private final TableId tableId;
+    private final Schema newSchema;
 
-    public RequestEmitFlushEvent(TableId tableId) {
+    public ReduceSchemaResponse(TableId tableId, Schema newSchema) {
         this.tableId = tableId;
+        this.newSchema = newSchema;
     }
 
     public TableId getTableId() {
         return tableId;
     }
 
+    public Schema getNewSchema() {
+        return newSchema;
+    }
+
     @Override
     public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (!(o instanceof RequestEmitFlushEvent)) {
+        if (!(o instanceof ReduceSchemaResponse)) {
             return false;
         }
-        RequestEmitFlushEvent that = (RequestEmitFlushEvent) o;
-        return Objects.equals(tableId, that.tableId);
+        ReduceSchemaResponse that = (ReduceSchemaResponse) o;
+        return Objects.equals(tableId, that.tableId) && Objects.equals(newSchema, that.newSchema);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(tableId);
+        return Objects.hash(tableId, newSchema);
+    }
+
+    @Override
+    public String toString() {
+        return "ReduceSchemaResponse{" + "tableId=" + tableId + ", newSchema=" + newSchema + '}';
     }
 }

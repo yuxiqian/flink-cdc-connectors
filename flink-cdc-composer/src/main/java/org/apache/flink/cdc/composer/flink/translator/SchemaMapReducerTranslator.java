@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.composer.definition.RouteDef;
+import org.apache.flink.cdc.runtime.operators.reducer.RouterProcessor;
 import org.apache.flink.cdc.runtime.operators.reducer.SchemaMapper;
 import org.apache.flink.cdc.runtime.operators.reducer.SchemaMapperFactory;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
@@ -67,11 +68,11 @@ public class SchemaMapReducerTranslator {
                             route.getReplaceSymbol().orElse(null)));
         }
         SingleOutputStreamOperator<Event> stream =
-                input.transform(
-                        "SchemaMapper",
-                        new EventTypeInfo(),
-                        new SchemaMapperFactory(
-                                metadataApplier, routingRules, rpcTimeOut, timezone));
+                input.flatMap(new RouterProcessor(routingRules))
+                        .transform(
+                                "SchemaMapper",
+                                new EventTypeInfo(),
+                                new SchemaMapperFactory(metadataApplier, rpcTimeOut, timezone));
         stream.uid(schemaMapReducerUid).setParallelism(parallelism);
         return stream;
     }

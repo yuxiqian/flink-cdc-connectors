@@ -17,101 +17,230 @@
 
 package org.apache.flink.cdc.runtime.operators.reducer;
 
+import org.apache.flink.cdc.common.data.RecordData;
+import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DataChangeEventWithSchema;
+import org.apache.flink.cdc.common.event.EmplaceTableSchemaEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.schema.Schema;
-import org.apache.flink.cdc.runtime.operators.reducer.events.ReleaseUpstreamEvent;
-import org.apache.flink.cdc.runtime.operators.reducer.events.RequestEmitFlushEvent;
+import org.apache.flink.cdc.common.types.DataType;
+import org.apache.flink.cdc.common.utils.SchemaInferencingUtils;
+import org.apache.flink.cdc.common.utils.SchemaUtils;
+import org.apache.flink.cdc.runtime.operators.reducer.events.BlockUpstreamRequest;
+import org.apache.flink.cdc.runtime.operators.reducer.events.ReduceSchemaRequest;
+import org.apache.flink.cdc.runtime.operators.reducer.events.ReduceSchemaResponse;
+import org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils;
+import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
+import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
+import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
+import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;
 import org.apache.flink.runtime.operators.coordination.OperatorEventHandler;
+import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
+import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
+import org.apache.flink.streaming.runtime.tasks.StreamTask;
+import org.apache.flink.util.SerializedValue;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nullable;
 
 import java.io.Serializable;
 import java.time.Duration;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /** This operator merges upstream inferred schema into a centralized Schema Registry. */
 public class SchemaMapper extends AbstractStreamOperator<Event>
         implements OneInputStreamOperator<Event, Event>, OperatorEventHandler, Serializable {
 
+    private static final Logger LOG = LoggerFactory.getLogger(SchemaMapper.class);
+
     // Final fields that are set upon construction
-    private final List<RouteRule> routingRules;
     private final Duration rpcTimeout;
     private final String timezone;
 
-    public SchemaMapper(List<RouteRule> routingRules, Duration rpcTimeOut, String timezone) {
-        this.routingRules = routingRules;
+    public SchemaMapper(Duration rpcTimeOut, String timezone) {
         this.rpcTimeout = rpcTimeOut;
         this.timezone = timezone;
     }
 
-    // Volatile fields that are set when operator is running
-    private volatile Map<TableId, Schema> schemaCacheMap;
-    private volatile AtomicBoolean shouldBlockUpstream;
-    private volatile AtomicBoolean alreadyEmitsFlushEvent;
+    // Transient fields that are set when operator is running
+    private transient TaskOperatorEventGateway toCoordinator;
+    private transient int subTaskId;
+    private transient AtomicBoolean shouldBlockUpstream;
+    private transient AtomicBoolean alreadyEmitsFlushEvent;
+    private transient volatile Map<TableId, Schema> schemaCacheMap;
+    private transient ExecutorService executors;
 
     @Override
     public void open() throws Exception {
         super.open();
-        schemaCacheMap = new HashMap<>();
+        subTaskId = getRuntimeContext().getTaskInfo().getIndexOfThisSubtask();
+        schemaCacheMap = new ConcurrentHashMap<>();
+        executors = Executors.newSingleThreadExecutor();
         shouldBlockUpstream = new AtomicBoolean(false);
-        alreadyEmitsFlushEvent = new AtomicBoolean(false);
+    }
+
+    @Override
+    public void setup(
+            StreamTask<?, ?> containingTask,
+            StreamConfig config,
+            Output<StreamRecord<Event>> output) {
+        super.setup(containingTask, config, output);
+        this.toCoordinator = containingTask.getEnvironment().getOperatorCoordinatorEventGateway();
     }
 
     @Override
     public void processElement(StreamRecord<Event> streamRecord) throws Exception {
-        while (shouldBlockUpstream.get()) {
-            Thread.sleep(100L);
-        }
-        Event event = streamRecord.getValue();
-        if (!(event instanceof DataChangeEventWithSchema)) {
-            throw new IllegalArgumentException(
-                    "Schema mapper received unexpected stream record. Expected DataChangeEventWithSchema, actual: "
-                            + event);
-        }
-        DataChangeEventWithSchema eventWithSchema = (DataChangeEventWithSchema) event;
+        // 0. Casting here is safe since we have an assertion check in RouterProcessor
+        DataChangeEventWithSchema eventWithSchema =
+                (DataChangeEventWithSchema) streamRecord.getValue();
+        LOG.info("{}> Schema Mapper received event: {}", subTaskId, eventWithSchema);
 
         // 1. Check if schema is compatible
-        while (!isSchemaCompatible(null)) {}
+        Optional<DataChangeEvent> coercedEvent;
 
-        // 2. Migrate to
-        output.collect(streamRecord);
-
-        if (shouldBlockUpstream.get()) {
-            if (alreadyEmitsFlushEvent.compareAndSet(false, true)) {
-                output.collect(new StreamRecord<>(new FlushEvent(null)));
-            }
+        // 2. Keep trying to coerce event until schema reducer has inferred a wide enough schema
+        // that could hold the event.
+        while (!(coercedEvent =
+                        tryCoerceEvent(
+                                eventWithSchema, schemaCacheMap.get(eventWithSchema.tableId())))
+                .isPresent()) {
+            requestSchemaReduce(eventWithSchema.tableId(), eventWithSchema.getSchema());
         }
+
+        LOG.info(
+                "{}> Sending coerced event (with arity: {}/{}) to downstream. Latest schema: {}",
+                subTaskId,
+                Optional.ofNullable(coercedEvent.get().before()).map(RecordData::getArity),
+                Optional.ofNullable(coercedEvent.get().after()).map(RecordData::getArity),
+                schemaCacheMap.get(eventWithSchema.tableId()));
+
+        // 3. Safely emit coerced event.
+        output.collect(new StreamRecord<>(coercedEvent.get()));
     }
 
-    private boolean isSchemaCompatible(Schema comingSchema) {
-        return true;
+    /**
+     * Try to coerce upcoming data change event to current schema. Returns coerced DataChangeEvent
+     * if given {@code dataChangeEventWithSchema} can be converted to {@code currentSchema} without
+     * loss. Returns {@code Optional#empty} otherwise and a schema reducing might be required.
+     */
+    private Optional<DataChangeEvent> tryCoerceEvent(
+            DataChangeEventWithSchema dataChangeEventWithSchema, @Nullable Schema currentSchema) {
+        // It's the first time we this, can't coerce event now
+        if (currentSchema == null) {
+            LOG.info("{}> current schema is NULL, needs schema reduce.", subTaskId);
+            return Optional.empty();
+        }
+        Schema upcomingSchema = dataChangeEventWithSchema.getSchema();
+
+        // Schema is identical, no need to coerce anything
+        if (Objects.equals(currentSchema, upcomingSchema)) {
+            return Optional.of(dataChangeEventWithSchema.getDataChangeEvent());
+        }
+
+        LOG.info(
+                "{}> current schema is {}, upcomingSchema is {}.",
+                subTaskId,
+                currentSchema,
+                upcomingSchema);
+
+        // Schema isn't identical but compatible, we can try to coerce it
+        if (SchemaInferencingUtils.isSchemaCompatible(currentSchema, upcomingSchema)) {
+            LOG.info("{}> Schema is compatible.", subTaskId);
+            BinaryRecordDataGenerator currentSchemaGenerator =
+                    new BinaryRecordDataGenerator(
+                            currentSchema.getColumnDataTypes().toArray(new DataType[0]));
+            List<RecordData.FieldGetter> upcomingFieldGetters =
+                    SchemaUtils.createFieldGetters(upcomingSchema);
+            DataChangeEvent dataChangeEvent = dataChangeEventWithSchema.getDataChangeEvent();
+
+            List<Object> before =
+                    SchemaUtils.restoreOriginalData(dataChangeEvent.before(), upcomingFieldGetters);
+            if (before != null) {
+                dataChangeEvent =
+                        DataChangeEvent.projectBefore(
+                                dataChangeEvent,
+                                currentSchemaGenerator.generate(
+                                        SchemaInferencingUtils.coerceRow(
+                                                timezone, currentSchema, upcomingSchema, before)));
+            }
+
+            List<Object> after =
+                    SchemaUtils.restoreOriginalData(dataChangeEvent.after(), upcomingFieldGetters);
+            if (after != null) {
+                dataChangeEvent =
+                        DataChangeEvent.projectAfter(
+                                dataChangeEvent,
+                                currentSchemaGenerator.generate(
+                                        SchemaInferencingUtils.coerceRow(
+                                                timezone, currentSchema, upcomingSchema, after)));
+            }
+
+            return Optional.of(dataChangeEvent);
+        }
+
+        // Schema is neither identical nor compatible, we need to block upstream and request
+        // reducing schema.
+        LOG.info("{}> Schema is incompatible.", subTaskId);
+        return Optional.empty();
     }
 
-    private static void routeEvent() {}
+    private void requestSchemaReduce(TableId tableId, Schema schema) {
+        LOG.info("{}> Sent FlushEvent {} for downstream...", subTaskId, tableId);
+        output.collect(new StreamRecord<>(new FlushEvent(tableId)));
+
+        LOG.info("{}> Sending reduce request...", subTaskId);
+        ReduceSchemaResponse response =
+                sendRequestToCoordinator(new ReduceSchemaRequest(subTaskId, tableId, schema));
+
+        LOG.info("{}> Reduce request response: {}", subTaskId, response);
+        schemaCacheMap.put(response.getTableId(), response.getNewSchema());
+        output.collect(
+                new StreamRecord<>(
+                        new EmplaceTableSchemaEvent(
+                                response.getTableId(), response.getNewSchema())));
+    }
 
     @Override
     public void handleOperatorEvent(OperatorEvent event) {
-        if (event instanceof RequestEmitFlushEvent) {
-            RequestEmitFlushEvent requestEmitFlushEvent = (RequestEmitFlushEvent) event;
-            shouldBlockUpstream.set(true);
-            if (alreadyEmitsFlushEvent.compareAndSet(false, true)) {
-                output.collect(
-                        new StreamRecord<>(new FlushEvent((requestEmitFlushEvent.getTableId()))));
-            }
-        } else if (event instanceof ReleaseUpstreamEvent) {
-            ReleaseUpstreamEvent releaseUpstreamEvent = (ReleaseUpstreamEvent) event;
-            schemaCacheMap.put(releaseUpstreamEvent.getTableId(), releaseUpstreamEvent.getSchema());
-            alreadyEmitsFlushEvent.set(false);
-            shouldBlockUpstream.set(false);
+        if (event instanceof BlockUpstreamRequest) {
+            LOG.info("{}> Received emit flush event request {}.", subTaskId, event);
+            BlockUpstreamRequest blockUpstreamRequest = (BlockUpstreamRequest) event;
+            // Request a dummy schema change request (though it's not necessary now) to align all
+            // schema mappers by ensuring they are all blocked and sent flush events.
+            requestSchemaReduce(
+                    blockUpstreamRequest.getTableId(),
+                    schemaCacheMap.get(blockUpstreamRequest.getTableId()));
+        } else {
+            throw new IllegalArgumentException("Unexpected operator event: " + event);
+        }
+    }
+
+    private <REQUEST extends CoordinationRequest, RESPONSE extends CoordinationResponse>
+            RESPONSE sendRequestToCoordinator(REQUEST request) {
+        try {
+            CompletableFuture<CoordinationResponse> responseFuture =
+                    toCoordinator.sendRequestToCoordinator(
+                            getOperatorID(), new SerializedValue<>(request));
+            return CoordinationResponseUtils.unwrap(responseFuture.get());
+        } catch (Exception e) {
+            throw new IllegalStateException(
+                    "Failed to send request to coordinator: " + request.toString(), e);
         }
     }
 }

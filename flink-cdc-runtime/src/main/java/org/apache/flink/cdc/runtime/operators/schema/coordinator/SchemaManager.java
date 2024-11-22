@@ -288,6 +288,10 @@ public class SchemaManager {
         }
     }
 
+    public void emplaceEvolvedSchema(TableId tableId, Schema schema) {
+        registerNewSchema(evolvedSchemas, tableId, schema);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {

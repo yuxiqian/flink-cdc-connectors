@@ -105,7 +105,7 @@ public class StimpsSourceFunction extends RichParallelSourceFunction<Event> {
     }
 
     @Override
-    public void run(SourceContext<Event> context) {
+    public void run(SourceContext<Event> context) throws InterruptedException {
         {
             // Emits shared CreateTableEvent first
             LOG.info("{}> Emitting CreateTableEvent", subTaskId);

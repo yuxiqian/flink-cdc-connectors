@@ -17,9 +17,24 @@
 
 package org.apache.flink.cdc.runtime.operators.reducer;
 
-import org.apache.flink.cdc.common.route.RouteRule;
+import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.cdc.common.event.AddColumnEvent;
+import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
+import org.apache.flink.cdc.common.event.CreateTableEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
+import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
+import org.apache.flink.cdc.common.utils.Preconditions;
+import org.apache.flink.cdc.common.utils.SchemaInferencingUtils;
+import org.apache.flink.cdc.runtime.operators.reducer.events.BlockUpstreamRequest;
+import org.apache.flink.cdc.runtime.operators.reducer.events.ReduceSchemaRequest;
+import org.apache.flink.cdc.runtime.operators.reducer.events.ReduceSchemaResponse;
+import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaManager;
 import org.apache.flink.cdc.runtime.operators.schema.event.FlushSuccessEvent;
+import org.apache.flink.cdc.runtime.operators.schema.event.GetEvolvedSchemaRequest;
+import org.apache.flink.cdc.runtime.operators.schema.event.GetEvolvedSchemaResponse;
 import org.apache.flink.cdc.runtime.operators.schema.event.SinkWriterRegisterEvent;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequestHandler;
@@ -35,9 +50,21 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+
+import static org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils.wrap;
 
 /** Coordinator node for {@link SchemaMapper}. */
 public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHandler {
@@ -48,44 +75,53 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
     private final String operatorName;
     private final ExecutorService coordinatorExecutor;
     private final MetadataApplier metadataApplier;
-    private final List<RouteRule> routes;
 
     public SchemaReducer(
             String operatorName,
             OperatorCoordinator.Context context,
             ExecutorService coordinatorExecutor,
-            MetadataApplier metadataApplier,
-            List<RouteRule> routes) {
+            MetadataApplier metadataApplier) {
         this.context = context;
         this.coordinatorExecutor = coordinatorExecutor;
         this.operatorName = operatorName;
         this.metadataApplier = metadataApplier;
-        this.routes = routes;
     }
 
-    private void runInEventLoop(
-            final ThrowingRunnable<Throwable> action,
-            final String actionName,
-            final Object... actionNameFormatParameters) {
-        coordinatorExecutor.execute(
-                () -> {
-                    try {
-                        action.run();
-                    } catch (Throwable t) {
-                        // if we have a JVM critical error, promote it immediately, there is a good
-                        // chance the logging or job failing will not succeed anymore
-                        ExceptionUtils.rethrowIfFatalErrorOrOOM(t);
+    private transient Set<Integer> activeSinkWriters;
+    private transient Set<Integer> flushedSinkWriters;
+    private transient Map<Integer, SubtaskGateway> subtaskGatewayMap;
+    private transient Map<Integer, Throwable> failedReasons;
+    private transient int currentParallelism;
+    private transient AtomicReference<RequestStatus> reducerStatus;
+    private transient AtomicInteger blockedUpstreamCount;
+    private transient Map<Integer, CompletableFuture<CoordinationResponse>> blockedUpstreams;
 
-                        final String actionString =
-                                String.format(actionName, actionNameFormatParameters);
-                        LOG.error(
-                                "Uncaught exception in the SchemaEvolutionCoordinator for {} while {}. Triggering job failover.",
-                                operatorName,
-                                actionString,
-                                t);
-                        context.failJob(t);
-                    }
-                });
+    // We only use SchemaManager to store "evolved" schemas that always keeps in sync with sink
+    // database.
+    // Upstream schema is meaningless since in schema inferencing mode, a unified upstream schema
+    // does not exist.
+    private transient SchemaManager schemaManager;
+
+    @Override
+    public void start() throws Exception {
+        LOG.info("Starting SchemaReducer for {}.", operatorName);
+        this.schemaManager = new SchemaManager(SchemaChangeBehavior.LENIENT);
+        this.activeSinkWriters = ConcurrentHashMap.newKeySet();
+        this.flushedSinkWriters = ConcurrentHashMap.newKeySet();
+        this.subtaskGatewayMap = new ConcurrentHashMap<>();
+        this.failedReasons = new ConcurrentHashMap<>();
+        this.currentParallelism = context.currentParallelism();
+        this.reducerStatus = new AtomicReference<>(RequestStatus.IDLE);
+        this.blockedUpstreamCount = new AtomicInteger(0);
+        this.blockedUpstreams = new HashMap<>();
+        LOG.info(
+                "Started SchemaRegistry for {}. Parallelism: {}", operatorName, currentParallelism);
+    }
+
+    @Override
+    public void close() throws Exception {
+        LOG.info("SchemaRegistry for {} closed.", operatorName);
+        coordinatorExecutor.shutdown();
     }
 
     @Override
@@ -94,7 +130,21 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
         CompletableFuture<CoordinationResponse> responseFuture = new CompletableFuture<>();
         runInEventLoop(
                 () -> {
-                    // TODO: Handle events from SchemaMapper
+                    try {
+                        if (request instanceof GetEvolvedSchemaRequest) {
+                            handleGetReducedSchemaRequest(
+                                    ((GetEvolvedSchemaRequest) request), responseFuture);
+                        } else if (request instanceof ReduceSchemaRequest) {
+                            handleReduceSchemaRequest(
+                                    (ReduceSchemaRequest) request, responseFuture);
+                        } else {
+                            throw new IllegalArgumentException(
+                                    "Unrecognized CoordinationRequest type: " + request);
+                        }
+                    } catch (Throwable t) {
+                        context.failJob(t);
+                        throw t;
+                    }
                 },
                 "handling coordination request %s",
                 request);
@@ -102,25 +152,14 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
     }
 
     @Override
-    public void start() throws Exception {}
-
-    @Override
-    public void close() throws Exception {}
-
-    @Override
     public void handleEventFromOperator(int subTaskId, int attemptNumber, OperatorEvent event) {
         runInEventLoop(
                 () -> {
                     try {
                         if (event instanceof FlushSuccessEvent) {
-                            FlushSuccessEvent flushSuccessEvent = (FlushSuccessEvent) event;
-                            LOG.info(
-                                    "Sink subtask {} succeed flushing for table {}.",
-                                    flushSuccessEvent.getSubtask(),
-                                    flushSuccessEvent.getTableId().toString());
-                            // TODO: Receive Flush Success Event
+                            handleFlushSuccessEvent((FlushSuccessEvent) event);
                         } else if (event instanceof SinkWriterRegisterEvent) {
-                            // TODO: Register Sink Writers
+                            activeSinkWriters.add(((SinkWriterRegisterEvent) event).getSubtask());
                         } else {
                             throw new FlinkRuntimeException(
                                     "Unrecognized Operator Event: " + event);
@@ -136,23 +175,240 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
     }
 
     @Override
-    public void checkpointCoordinator(long checkpointId, CompletableFuture<byte[]> resultFuture)
-            throws Exception {}
-
-    @Override
-    public void notifyCheckpointComplete(long checkpointId) {}
-
-    @Override
-    public void resetToCheckpoint(long checkpointId, @Nullable byte[] checkpointData)
-            throws Exception {}
-
-    @Override
-    public void subtaskReset(int subTask, long checkpointId) {}
+    public void subtaskReset(int subTaskId, long checkpointId) {
+        Throwable rootCause = failedReasons.get(subTaskId);
+        LOG.error("Subtask {} reset at checkpoint {}.", subTaskId, checkpointId, rootCause);
+        subtaskGatewayMap.remove(subTaskId);
+    }
 
     @Override
     public void executionAttemptFailed(
-            int subtask, int attemptNumber, @Nullable Throwable reason) {}
+            int subTaskId, int attemptNumber, @Nullable Throwable reason) {
+        failedReasons.put(subTaskId, reason);
+    }
 
     @Override
-    public void executionAttemptReady(int subtask, int attemptNumber, SubtaskGateway gateway) {}
+    public void executionAttemptReady(int subTaskId, int attemptNumber, SubtaskGateway gateway) {
+        subtaskGatewayMap.put(subTaskId, gateway);
+    }
+
+    @Override
+    public void checkpointCoordinator(long checkpointId, CompletableFuture<byte[]> resultFuture) {
+        runInEventLoop(
+                () -> {
+                    try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                            DataOutputStream out = new DataOutputStream(baos)) {
+                        // Serialize SchemaManager
+                        int schemaManagerSerializerVersion = SchemaManager.SERIALIZER.getVersion();
+                        out.writeInt(schemaManagerSerializerVersion);
+                        byte[] serializedSchemaManager =
+                                SchemaManager.SERIALIZER.serialize(schemaManager);
+                        out.writeInt(serializedSchemaManager.length);
+                        out.write(serializedSchemaManager);
+                    } catch (Throwable t) {
+                        context.failJob(t);
+                        throw t;
+                    }
+                },
+                "taking checkpoint %d",
+                checkpointId);
+    }
+
+    @Override
+    public void notifyCheckpointComplete(long checkpointId) {
+        // do nothing
+    }
+
+    @Override
+    public void resetToCheckpoint(long checkpointId, @Nullable byte[] checkpointData)
+            throws Exception {
+        if (checkpointData == null) {
+            return;
+        }
+        try (ByteArrayInputStream bais = new ByteArrayInputStream(checkpointData);
+                DataInputStream in = new DataInputStream(bais)) {
+            int schemaManagerSerializerVersion = in.readInt();
+            int length = in.readInt();
+            byte[] serializedSchemaManager = new byte[length];
+            in.readFully(serializedSchemaManager);
+            schemaManager =
+                    SchemaManager.SERIALIZER.deserialize(
+                            schemaManagerSerializerVersion, serializedSchemaManager);
+        } catch (Throwable t) {
+            context.failJob(t);
+            throw t;
+        }
+    }
+
+    protected void handleReduceSchemaRequest(
+            ReduceSchemaRequest request, CompletableFuture<CoordinationResponse> responseFuture) {
+        LOG.info("Reducer received schema reduce request {}...", request);
+        blockedUpstreams.put(request.getSubTaskId(), responseFuture);
+
+        int blockCnt = blockedUpstreamCount.incrementAndGet();
+
+        if (blockCnt == 1) {
+            Preconditions.checkState(
+                    reducerStatus.compareAndSet(RequestStatus.IDLE, RequestStatus.BROADCASTING),
+                    "Unexpected reducer status: " + reducerStatus.get());
+            LOG.info(
+                    "Received the very-first schema reduce request {}. Switching from IDLE to BROADCASTING.",
+                    request);
+            broadcastFlushEventRequest(request.getTableId());
+        }
+
+        // No else if, since currentParallelism might be == 1
+        if (blockCnt == currentParallelism) {
+            Preconditions.checkState(
+                    reducerStatus.compareAndSet(RequestStatus.BROADCASTING, RequestStatus.EVOLVING),
+                    "Unexpected reducer status: " + reducerStatus.get());
+            reduceSchema(request.getTableId(), request.getSchema());
+        }
+    }
+
+    protected void handleFlushSuccessEvent(FlushSuccessEvent event) {
+        LOG.info(
+                "Sink subtask {} succeed flushing for table {}.",
+                event.getSubtask(),
+                event.getTableId().toString());
+        flushedSinkWriters.add(event.getSubtask());
+    }
+
+    protected void handleGetReducedSchemaRequest(
+            GetEvolvedSchemaRequest getEvolvedSchemaRequest,
+            CompletableFuture<CoordinationResponse> response) {
+        LOG.info("Handling evolved schema request: {}", getEvolvedSchemaRequest);
+        int schemaVersion = getEvolvedSchemaRequest.getSchemaVersion();
+        TableId tableId = getEvolvedSchemaRequest.getTableId();
+        if (schemaVersion == GetEvolvedSchemaRequest.LATEST_SCHEMA_VERSION) {
+            response.complete(
+                    wrap(
+                            new GetEvolvedSchemaResponse(
+                                    schemaManager.getLatestEvolvedSchema(tableId).orElse(null))));
+        } else {
+            try {
+                response.complete(
+                        wrap(
+                                new GetEvolvedSchemaResponse(
+                                        schemaManager.getEvolvedSchema(tableId, schemaVersion))));
+            } catch (IllegalArgumentException iae) {
+                LOG.warn(
+                        "Some client is requesting an non-existed evolved schema for table {} with version {}",
+                        tableId,
+                        schemaVersion);
+                response.complete(wrap(new GetEvolvedSchemaResponse(null)));
+            }
+        }
+    }
+
+    private void broadcastFlushEventRequest(TableId tableId) {
+        subtaskGatewayMap.forEach(
+                (subTaskId, gateway) -> {
+                    LOG.info("Try to broadcast FlushEventRequest for {} to {}", tableId, subTaskId);
+                    gateway.sendEvent(new BlockUpstreamRequest(tableId));
+                });
+    }
+
+    private void reduceSchema(TableId tableId, Schema upcomingSchema) {
+        Tuple2<Schema, List<SchemaChangeEvent>> inferResults =
+                inferWiderSchemaAndChanges(
+                        tableId,
+                        schemaManager.getLatestEvolvedSchema(tableId).orElse(null),
+                        upcomingSchema);
+
+        // The widest inferred schema
+        Schema newSchema = inferResults.f0;
+
+        // The corresponding schema change events that required to make current schema to the
+        // newSchema.
+        List<SchemaChangeEvent> schemaChangeEvents = inferResults.f1;
+
+        while (flushedSinkWriters.size() < currentParallelism) {
+            // Waiting for all sink writers to flush their buffered data.
+            LOG.info(
+                    "Not all sink writers have successfully flushed. Expected {}, actual {}",
+                    currentParallelism,
+                    flushedSinkWriters);
+            try {
+                Thread.sleep(1000L);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        LOG.info(
+                "All flushed. Going to reduce schema for {}. current schema: {}, upcoming schema: {}, widened schema: {}, schema changes: {}",
+                tableId,
+                schemaManager.getLatestEvolvedSchema(tableId).orElse(null),
+                upcomingSchema,
+                newSchema,
+                schemaChangeEvents);
+
+        // First we apply the schema change events to external DBMS via Metadata Applier...
+        schemaChangeEvents.forEach(metadataApplier::applySchemaChange);
+
+        // Then, update schema manager's cache...
+        schemaManager.emplaceEvolvedSchema(tableId, newSchema);
+
+        blockedUpstreams.forEach(
+                (subTaskId, future) -> {
+                    LOG.info("Reducer finishes pending future from {}", subTaskId);
+                    future.complete(wrap(new ReduceSchemaResponse(tableId, newSchema)));
+                });
+
+        blockedUpstreamCount.set(0);
+        blockedUpstreams.clear();
+
+        LOG.info("Finished schema evolving. Switching from EVOLVING to IDLE.");
+        reducerStatus.compareAndSet(RequestStatus.EVOLVING, RequestStatus.IDLE);
+    }
+
+    /**
+     * Given {@code currentSchema} and {@code upcomingSchema}, this function infers the wider schema
+     * that is compatible with {@code currentSchema} (which means we only alter column types wider
+     * and adds NULLABLE columns at last), and generates corresponding {@link SchemaChangeEvent}s
+     * for {@link MetadataApplier} to evolve actual downstream DBMS schema. Notice that there will
+     * be at most 2 events in the returning {@code List}: An {@link AddColumnEvent} and an {@link
+     * AlterColumnTypeEvent}, or a {@link CreateTableEvent}.
+     */
+    private Tuple2<Schema, List<SchemaChangeEvent>> inferWiderSchemaAndChanges(
+            TableId tableId, @Nullable Schema currentSchema, Schema upcomingSchema) {
+        return SchemaInferencingUtils.getLeastCommonSchema(tableId, currentSchema, upcomingSchema);
+    }
+
+    private void runInEventLoop(
+            final ThrowingRunnable<Throwable> action,
+            final String actionName,
+            final Object... actionNameFormatParameters) {
+        coordinatorExecutor.execute(
+                () -> {
+                    try {
+                        action.run();
+                    } catch (Throwable t) {
+                        // if we have a JVM critical error, promote it immediately, there is a good
+                        // chance the logging or job failing will not succeed anymore
+                        ExceptionUtils.rethrowIfFatalErrorOrOOM(t);
+                        final String actionString =
+                                String.format(actionName, actionNameFormatParameters);
+                        LOG.error(
+                                "Uncaught exception in the SchemaReducer for {} while {}. Triggering job failover.",
+                                operatorName,
+                                actionString,
+                                t);
+                        context.failJob(t);
+                    }
+                });
+    }
+
+    /**
+     * {@code IDLE}: Initial idling state, ready for requests. <br>
+     * {@code BROADCASTING}: Trying to block all mappers before they blocked upstream & collect
+     * FlushEvents. <br>
+     * {@code EVOLVING}: Applying schema change to sink.
+     */
+    private enum RequestStatus {
+        IDLE,
+        BROADCASTING,
+        EVOLVING
+    }
 }

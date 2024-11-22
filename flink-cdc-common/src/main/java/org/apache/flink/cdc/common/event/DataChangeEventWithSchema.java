@@ -58,6 +58,10 @@ public class DataChangeEventWithSchema implements ChangeEvent, Serializable {
         return dataChangeEvent;
     }
 
+    public DataChangeEventWithSchema copy(TableId tableId) {
+        return new DataChangeEventWithSchema(schema, dataChangeEvent.copy(tableId));
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {

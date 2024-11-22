@@ -165,7 +165,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
                             dataSink.getDataChangeEventHashFunctionProvider(parallelism),
                             true);
 
-            // Partitioning -> MapReduce
+            // Partitioning -> Route -> MapReduce
             stream =
                     schemaMapReducerTranslator.translate(
                             stream,

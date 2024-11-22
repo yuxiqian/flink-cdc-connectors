@@ -18,16 +18,17 @@
 package org.apache.flink.cdc.runtime.operators.reducer;
 
 import org.apache.flink.cdc.common.event.Event;
-import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.operators.coordination.OperatorCoordinator;
+import org.apache.flink.runtime.operators.coordination.OperatorEventDispatcher;
 import org.apache.flink.streaming.api.operators.CoordinatedOperatorFactory;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.SimpleOperatorFactory;
+import org.apache.flink.streaming.api.operators.StreamOperator;
+import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
 
 import java.time.Duration;
-import java.util.List;
 
 /** Factory to create {@link SchemaMapper}. */
 public class SchemaMapperFactory extends SimpleOperatorFactory<Event>
@@ -35,21 +36,27 @@ public class SchemaMapperFactory extends SimpleOperatorFactory<Event>
     private static final long serialVersionUID = 1L;
 
     private final MetadataApplier metadataApplier;
-    private final List<RouteRule> routingRules;
 
     public SchemaMapperFactory(
-            MetadataApplier metadataApplier,
-            List<RouteRule> routingRules,
-            Duration rpcTimeOut,
-            String timezone) {
-        super(new SchemaMapper(routingRules, rpcTimeOut, timezone));
+            MetadataApplier metadataApplier, Duration rpcTimeOut, String timezone) {
+        super(new SchemaMapper(rpcTimeOut, timezone));
         this.metadataApplier = metadataApplier;
-        this.routingRules = routingRules;
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T extends StreamOperator<Event>> T createStreamOperator(
+            StreamOperatorParameters<Event> parameters) {
+        SchemaMapper mapper = super.createStreamOperator(parameters);
+        final OperatorID operatorId = parameters.getStreamConfig().getOperatorID();
+        final OperatorEventDispatcher eventDispatcher = parameters.getOperatorEventDispatcher();
+        eventDispatcher.registerEventHandler(operatorId, mapper);
+        return (T) mapper;
     }
 
     @Override
     public OperatorCoordinator.Provider getCoordinatorProvider(
             String operatorName, OperatorID operatorID) {
-        return new SchemaReducerProvider(operatorID, operatorName, metadataApplier, routingRules);
+        return new SchemaReducerProvider(operatorID, operatorName, metadataApplier);
     }
 }

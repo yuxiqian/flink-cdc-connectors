@@ -19,26 +19,23 @@ package org.apache.flink.cdc.runtime.operators.reducer.events;
 
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
-import org.apache.flink.cdc.runtime.operators.reducer.SchemaMapper;
-import org.apache.flink.runtime.operators.coordination.OperatorEvent;
+import org.apache.flink.cdc.runtime.operators.reducer.SchemaReducer;
+import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 
-import java.util.Objects;
-
-/**
- * A {@link OperatorEvent} from schema reducer to notify {@link SchemaMapper} that it could release
- * upstream and update local schemas now.
- */
-public class ReleaseUpstreamEvent implements OperatorEvent {
-    private static final long serialVersionUID = 1L;
-
-    /** The schema changes to be broadcast. */
+/** Mapper's request to {@link SchemaReducer} for reducing an incompatible schema. */
+public class ReduceSchemaRequest implements CoordinationRequest {
+    private final int subTaskId;
     private final TableId tableId;
-
     private final Schema schema;
 
-    public ReleaseUpstreamEvent(TableId tableId, Schema schema) {
+    public ReduceSchemaRequest(int subTaskId, TableId tableId, Schema schema) {
+        this.subTaskId = subTaskId;
         this.tableId = tableId;
         this.schema = schema;
+    }
+
+    public int getSubTaskId() {
+        return subTaskId;
     }
 
     public TableId getTableId() {
@@ -50,19 +47,14 @@ public class ReleaseUpstreamEvent implements OperatorEvent {
     }
 
     @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (!(o instanceof ReleaseUpstreamEvent)) {
-            return false;
-        }
-        ReleaseUpstreamEvent that = (ReleaseUpstreamEvent) o;
-        return Objects.equals(tableId, that.tableId) && Objects.equals(schema, that.schema);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(tableId, schema);
+    public String toString() {
+        return "ReduceSchemaRequest{"
+                + "subTaskId="
+                + subTaskId
+                + ", tableId="
+                + tableId
+                + ", schema="
+                + schema
+                + '}';
     }
 }

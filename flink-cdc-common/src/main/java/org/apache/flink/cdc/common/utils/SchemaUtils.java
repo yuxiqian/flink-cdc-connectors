@@ -40,7 +40,6 @@ import org.apache.flink.cdc.common.types.ZonedTimestampType;
 import javax.annotation.Nullable;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +47,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+
+import static org.apache.flink.cdc.common.types.DataTypes.BIGINT;
 
 /** Utils for {@link Schema} to perform the ability of evolution. */
 @PublicEvolving
@@ -74,10 +75,10 @@ public class SchemaUtils {
     }
 
     /** Restore original data fields from RecordData structure. */
-    public static List<Object> restoreOriginalData(
+    public static @Nullable List<Object> restoreOriginalData(
             @Nullable RecordData recordData, List<RecordData.FieldGetter> fieldGetters) {
         if (recordData == null) {
-            return Collections.emptyList();
+            return null;
         }
         List<Object> actualFields = new ArrayList<>();
         for (RecordData.FieldGetter fieldGetter : fieldGetters) {
@@ -199,7 +200,7 @@ public class SchemaUtils {
             return DataTypes.TIMESTAMP(TimestampType.MAX_PRECISION);
         } else if (lType.is(DataTypeFamily.INTEGER_NUMERIC)
                 && rType.is(DataTypeFamily.INTEGER_NUMERIC)) {
-            mergedType = DataTypes.BIGINT();
+            mergedType = BIGINT();
         } else if (lType.is(DataTypeFamily.CHARACTER_STRING)
                 && rType.is(DataTypeFamily.CHARACTER_STRING)) {
             mergedType = DataTypes.STRING();

@@ -17,13 +17,11 @@
 
 package org.apache.flink.cdc.runtime.operators.reducer;
 
-import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistryProvider;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.operators.coordination.OperatorCoordinator;
 
-import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -34,17 +32,12 @@ public class SchemaReducerProvider implements OperatorCoordinator.Provider {
     private final OperatorID operatorID;
     private final String operatorName;
     private final MetadataApplier metadataApplier;
-    private final List<RouteRule> routingRules;
 
     public SchemaReducerProvider(
-            OperatorID operatorID,
-            String operatorName,
-            MetadataApplier metadataApplier,
-            List<RouteRule> routingRules) {
+            OperatorID operatorID, String operatorName, MetadataApplier metadataApplier) {
         this.operatorID = operatorID;
         this.operatorName = operatorName;
         this.metadataApplier = metadataApplier;
-        this.routingRules = routingRules;
     }
 
     @Override
@@ -59,7 +52,6 @@ public class SchemaReducerProvider implements OperatorCoordinator.Provider {
                         "schema-evolution-coordinator", context.getUserCodeClassloader());
         ExecutorService coordinatorExecutor =
                 Executors.newSingleThreadExecutor(coordinatorThreadFactory);
-        return new SchemaReducer(
-                operatorName, context, coordinatorExecutor, metadataApplier, routingRules);
+        return new SchemaReducer(operatorName, context, coordinatorExecutor, metadataApplier);
     }
 }
