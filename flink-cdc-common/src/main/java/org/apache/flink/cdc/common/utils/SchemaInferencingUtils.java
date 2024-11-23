@@ -133,7 +133,7 @@ public class SchemaInferencingUtils {
                         .collect(Collectors.toMap(Column::getName, Column::getType));
         Map<String, Object> upcomingColumnObjects =
                 Streams.zip(
-                                currentSchema.getColumnNames().stream(),
+                                upcomingSchema.getColumnNames().stream(),
                                 upcomingRow.stream(),
                                 Tuple2::of)
                         .collect(Collectors.toMap(t -> t.f0, t -> t.f1));

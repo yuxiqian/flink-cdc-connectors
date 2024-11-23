@@ -77,7 +77,6 @@ class FlinkSchemaInferencingPipelineITCase {
     private final PrintStream standardOut = System.out;
     private final ByteArrayOutputStream outCaptor = new ByteArrayOutputStream();
 
-
     @BeforeEach
     void init() {
         // Take over STDOUT as we need to check the output of values sink
@@ -89,9 +88,10 @@ class FlinkSchemaInferencingPipelineITCase {
     @AfterEach
     void cleanup() {
         System.setOut(standardOut);
-        System.out.println("NOTICE: This is a fuzzy test. Please check if value sink prints expected events:");
+        System.out.println(
+                "NOTICE: This is a fuzzy test. Please check if value sink prints expected events:");
         System.out.println("================================");
-        System.out.println(outCaptor);
+        System.out.print(outCaptor);
         System.out.println("================================");
     }
 
