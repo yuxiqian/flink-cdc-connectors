@@ -38,6 +38,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
+import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.util.Collections;
 
@@ -74,16 +75,24 @@ class FlinkSchemaInferencingPipelineITCase {
                             .build());
 
     private final PrintStream standardOut = System.out;
+    private final ByteArrayOutputStream outCaptor = new ByteArrayOutputStream();
+
 
     @BeforeEach
     void init() {
+        // Take over STDOUT as we need to check the output of values sink
+        System.setOut(new PrintStream(outCaptor));
         // Initialize in-memory database
         ValuesDatabase.clear();
     }
 
     @AfterEach
     void cleanup() {
-        // do nothing
+        System.setOut(standardOut);
+        System.out.println("NOTICE: This is a fuzzy test. Please check if value sink prints expected events:");
+        System.out.println("================================");
+        System.out.println(outCaptor);
+        System.out.println("================================");
     }
 
     @ParameterizedTest
@@ -121,7 +130,7 @@ class FlinkSchemaInferencingPipelineITCase {
         PipelineExecution execution = composer.compose(pipelineDef);
         execution.execute();
 
-        // This is a fuzzy test - it is a big success as long as our pipeline didn't break
+        // This is a fuzzy test - it is a big success as long as our pipeline didn't break.
     }
 
     @ParameterizedTest
@@ -159,8 +168,6 @@ class FlinkSchemaInferencingPipelineITCase {
         PipelineExecution execution = composer.compose(pipelineDef);
 
         // This is a fuzzy test - it is a big success as long as our pipeline didn't break.
-        // Currently, if a subTask finishes, its message could never be delivered and will fail.
-        // TODO: I'll fix this later.
         execution.execute();
     }
 }

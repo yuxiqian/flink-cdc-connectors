@@ -25,6 +25,7 @@ import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
+import org.apache.flink.cdc.common.event.EmplaceTableSchemaEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
@@ -247,6 +248,10 @@ public class ValuesDatabase {
                 globalTables.put(
                         tableId, new ValuesTable(tableId, ((CreateTableEvent) event).getSchema()));
             }
+        } else if (event instanceof EmplaceTableSchemaEvent) {
+            globalTables.put(
+                    tableId,
+                    new ValuesTable(tableId, ((EmplaceTableSchemaEvent) event).getSchema()));
         } else if (event instanceof DropTableEvent) {
             globalTables.remove(tableId);
         } else if (event instanceof TruncateTableEvent) {

@@ -45,6 +45,9 @@ import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.function.ThrowingRunnable;
 
+import org.apache.flink.shaded.guava31.com.google.common.collect.ArrayListMultimap;
+import org.apache.flink.shaded.guava31.com.google.common.collect.Multimap;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,6 +57,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -94,7 +98,15 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
     private transient int currentParallelism;
     private transient AtomicReference<RequestStatus> reducerStatus;
     private transient AtomicInteger blockedUpstreamCount;
-    private transient Map<Integer, CompletableFuture<CoordinationResponse>> blockedUpstreams;
+    private transient Map<
+                    Integer, Tuple2<ReduceSchemaRequest, CompletableFuture<CoordinationResponse>>>
+            pendingRequests;
+
+    // This number was kept in-sync to indicate the number of global schema reducing requests that
+    // have been processed.
+    // Used for filtering out late-coming BlockUpstreamRequest if requestSchemaReduce was already
+    // emitted in `processElement` method.
+    private transient AtomicInteger schemaMapperSeqNum;
 
     // We only use SchemaManager to store "evolved" schemas that always keeps in sync with sink
     // database.
@@ -113,7 +125,8 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
         this.currentParallelism = context.currentParallelism();
         this.reducerStatus = new AtomicReference<>(RequestStatus.IDLE);
         this.blockedUpstreamCount = new AtomicInteger(0);
-        this.blockedUpstreams = new HashMap<>();
+        this.pendingRequests = new HashMap<>();
+        this.schemaMapperSeqNum = new AtomicInteger(0);
         LOG.info(
                 "Started SchemaRegistry for {}. Parallelism: {}", operatorName, currentParallelism);
     }
@@ -243,7 +256,7 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
     protected void handleReduceSchemaRequest(
             ReduceSchemaRequest request, CompletableFuture<CoordinationResponse> responseFuture) {
         LOG.info("Reducer received schema reduce request {}...", request);
-        blockedUpstreams.put(request.getSubTaskId(), responseFuture);
+        pendingRequests.put(request.getSubTaskId(), Tuple2.of(request, responseFuture));
 
         int blockCnt = blockedUpstreamCount.incrementAndGet();
 
@@ -262,7 +275,7 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
             Preconditions.checkState(
                     reducerStatus.compareAndSet(RequestStatus.BROADCASTING, RequestStatus.EVOLVING),
                     "Unexpected reducer status: " + reducerStatus.get());
-            reduceSchema(request.getTableId(), request.getSchema());
+            reduceSchema();
         }
     }
 
@@ -305,23 +318,12 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
         subtaskGatewayMap.forEach(
                 (subTaskId, gateway) -> {
                     LOG.info("Try to broadcast FlushEventRequest for {} to {}", tableId, subTaskId);
-                    gateway.sendEvent(new BlockUpstreamRequest(tableId));
+                    gateway.sendEvent(new BlockUpstreamRequest(tableId, schemaMapperSeqNum.get()));
                 });
     }
 
-    private void reduceSchema(TableId tableId, Schema upcomingSchema) {
-        Tuple2<Schema, List<SchemaChangeEvent>> inferResults =
-                inferWiderSchemaAndChanges(
-                        tableId,
-                        schemaManager.getLatestEvolvedSchema(tableId).orElse(null),
-                        upcomingSchema);
-
-        // The widest inferred schema
-        Schema newSchema = inferResults.f0;
-
-        // The corresponding schema change events that required to make current schema to the
-        // newSchema.
-        List<SchemaChangeEvent> schemaChangeEvents = inferResults.f1;
+    private void reduceSchema() {
+        LOG.info("Starting to reduce schema. ");
 
         while (flushedSinkWriters.size() < currentParallelism) {
             // Waiting for all sink writers to flush their buffered data.
@@ -336,28 +338,57 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
             }
         }
 
-        LOG.info(
-                "All flushed. Going to reduce schema for {}. current schema: {}, upcoming schema: {}, widened schema: {}, schema changes: {}",
-                tableId,
-                schemaManager.getLatestEvolvedSchema(tableId).orElse(null),
-                upcomingSchema,
-                newSchema,
-                schemaChangeEvents);
+        LOG.info("All flushed. Going to reduce schema for pending requests: {}", pendingRequests);
 
-        // First we apply the schema change events to external DBMS via Metadata Applier...
-        schemaChangeEvents.forEach(metadataApplier::applySchemaChange);
+        // Organize reduced schemas by TableId
+        Multimap<TableId, Schema> groupedPendingSchemas = ArrayListMultimap.create();
+        pendingRequests.values().stream()
+                .map(e -> e.f0)
+                .filter(request -> !request.isAlignRequest())
+                .forEach(
+                        request ->
+                                groupedPendingSchemas.put(
+                                        request.getTableId(), request.getSchema()));
 
-        // Then, update schema manager's cache...
-        schemaManager.emplaceEvolvedSchema(tableId, newSchema);
+        // Remembering tables whose schema got changed. Used to broadcast it to SchemaMappers later.
+        Map<TableId, Schema> updatedSchemasMap = new HashMap<>();
 
-        blockedUpstreams.forEach(
-                (subTaskId, future) -> {
+        for (TableId tableId : groupedPendingSchemas.keySet()) {
+            Tuple2<Schema, List<SchemaChangeEvent>> inferResults =
+                    inferWiderSchemaAndChanges(
+                            tableId,
+                            schemaManager.getLatestEvolvedSchema(tableId).orElse(null),
+                            groupedPendingSchemas.get(tableId));
+
+            // The widest inferred schema
+            Schema newSchema = inferResults.f0;
+
+            // The corresponding schema change events that required to make current schema to the
+            // newSchema.
+            List<SchemaChangeEvent> schemaChangeEvents = inferResults.f1;
+
+            // First we apply the schema change events to external DBMS via Metadata Applier...
+            schemaChangeEvents.forEach(metadataApplier::applySchemaChange);
+
+            // Then, update schema manager's cache...
+            schemaManager.emplaceEvolvedSchema(tableId, newSchema);
+
+            // Mark this table's schema has changed, will broadcast it to mapper later...
+            updatedSchemasMap.put(tableId, newSchema);
+        }
+
+        pendingRequests.forEach(
+                (subTaskId, tuple) -> {
                     LOG.info("Reducer finishes pending future from {}", subTaskId);
-                    future.complete(wrap(new ReduceSchemaResponse(tableId, newSchema)));
+                    tuple.f1.complete(
+                            wrap(
+                                    new ReduceSchemaResponse(
+                                            updatedSchemasMap,
+                                            schemaMapperSeqNum.incrementAndGet())));
                 });
 
         blockedUpstreamCount.set(0);
-        blockedUpstreams.clear();
+        pendingRequests.clear();
 
         LOG.info("Finished schema evolving. Switching from EVOLVING to IDLE.");
         reducerStatus.compareAndSet(RequestStatus.EVOLVING, RequestStatus.IDLE);
@@ -373,7 +404,24 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
      */
     private Tuple2<Schema, List<SchemaChangeEvent>> inferWiderSchemaAndChanges(
             TableId tableId, @Nullable Schema currentSchema, Schema upcomingSchema) {
-        return SchemaInferencingUtils.getLeastCommonSchema(tableId, currentSchema, upcomingSchema);
+        Schema commonSchema =
+                SchemaInferencingUtils.getLeastCommonSchema(currentSchema, upcomingSchema);
+        List<SchemaChangeEvent> requiredSchemaChanges =
+                SchemaInferencingUtils.getSchemaDifference(tableId, currentSchema, commonSchema);
+        return Tuple2.of(commonSchema, requiredSchemaChanges);
+    }
+
+    /** Similar to the previous one, but allows more schemas. */
+    private Tuple2<Schema, List<SchemaChangeEvent>> inferWiderSchemaAndChanges(
+            TableId tableId, @Nullable Schema currentSchema, Collection<Schema> schemas) {
+        Schema commonSchema = currentSchema;
+        for (Schema upcomingSchema : schemas) {
+            commonSchema =
+                    SchemaInferencingUtils.getLeastCommonSchema(commonSchema, upcomingSchema);
+        }
+        List<SchemaChangeEvent> requiredSchemaChanges =
+                SchemaInferencingUtils.getSchemaDifference(tableId, currentSchema, commonSchema);
+        return Tuple2.of(commonSchema, requiredSchemaChanges);
     }
 
     private void runInEventLoop(

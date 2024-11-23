@@ -59,9 +59,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /** This operator merges upstream inferred schema into a centralized Schema Registry. */
 public class SchemaMapper extends AbstractStreamOperator<Event>
@@ -70,29 +67,24 @@ public class SchemaMapper extends AbstractStreamOperator<Event>
     private static final Logger LOG = LoggerFactory.getLogger(SchemaMapper.class);
 
     // Final fields that are set upon construction
-    private final Duration rpcTimeout;
     private final String timezone;
 
     public SchemaMapper(Duration rpcTimeOut, String timezone) {
-        this.rpcTimeout = rpcTimeOut;
         this.timezone = timezone;
     }
 
     // Transient fields that are set when operator is running
     private transient TaskOperatorEventGateway toCoordinator;
     private transient int subTaskId;
-    private transient AtomicBoolean shouldBlockUpstream;
-    private transient AtomicBoolean alreadyEmitsFlushEvent;
     private transient volatile Map<TableId, Schema> schemaCacheMap;
-    private transient ExecutorService executors;
+    private transient volatile int schemaMapperSeqNum;
 
     @Override
     public void open() throws Exception {
         super.open();
         subTaskId = getRuntimeContext().getTaskInfo().getIndexOfThisSubtask();
         schemaCacheMap = new ConcurrentHashMap<>();
-        executors = Executors.newSingleThreadExecutor();
-        shouldBlockUpstream = new AtomicBoolean(false);
+        schemaMapperSeqNum = 0;
     }
 
     @Override
@@ -120,7 +112,7 @@ public class SchemaMapper extends AbstractStreamOperator<Event>
                         tryCoerceEvent(
                                 eventWithSchema, schemaCacheMap.get(eventWithSchema.tableId())))
                 .isPresent()) {
-            requestSchemaReduce(eventWithSchema.tableId(), eventWithSchema.getSchema());
+            requestSchemaReduce(eventWithSchema.tableId(), eventWithSchema.getSchema(), false);
         }
 
         LOG.info(
@@ -200,20 +192,30 @@ public class SchemaMapper extends AbstractStreamOperator<Event>
         return Optional.empty();
     }
 
-    private void requestSchemaReduce(TableId tableId, Schema schema) {
+    private void requestSchemaReduce(TableId tableId, Schema schema, boolean isAlign) {
         LOG.info("{}> Sent FlushEvent {} for downstream...", subTaskId, tableId);
         output.collect(new StreamRecord<>(new FlushEvent(tableId)));
 
         LOG.info("{}> Sending reduce request...", subTaskId);
         ReduceSchemaResponse response =
-                sendRequestToCoordinator(new ReduceSchemaRequest(subTaskId, tableId, schema));
+                sendRequestToCoordinator(
+                        isAlign
+                                ? ReduceSchemaRequest.alignRequest(subTaskId)
+                                : new ReduceSchemaRequest(subTaskId, tableId, schema));
 
         LOG.info("{}> Reduce request response: {}", subTaskId, response);
-        schemaCacheMap.put(response.getTableId(), response.getNewSchema());
-        output.collect(
-                new StreamRecord<>(
-                        new EmplaceTableSchemaEvent(
-                                response.getTableId(), response.getNewSchema())));
+
+        response.getLatestReducedSchema()
+                .forEach(
+                        (reducedTableId, reducedSchema) -> {
+                            schemaCacheMap.put(reducedTableId, reducedSchema);
+                            output.collect(
+                                    new StreamRecord<>(
+                                            new EmplaceTableSchemaEvent(
+                                                    reducedTableId, reducedSchema)));
+                        });
+
+        schemaMapperSeqNum = response.getReduceSeqNum();
     }
 
     @Override
@@ -221,11 +223,20 @@ public class SchemaMapper extends AbstractStreamOperator<Event>
         if (event instanceof BlockUpstreamRequest) {
             LOG.info("{}> Received emit flush event request {}.", subTaskId, event);
             BlockUpstreamRequest blockUpstreamRequest = (BlockUpstreamRequest) event;
+
+            if (blockUpstreamRequest.getReduceSeqNum() < schemaMapperSeqNum) {
+                LOG.info(
+                        "{}> Stale block upstream request, it might have been requested in processElement. Drop it.",
+                        subTaskId);
+                return;
+            }
+
             // Request a dummy schema change request (though it's not necessary now) to align all
             // schema mappers by ensuring they are all blocked and sent flush events.
             requestSchemaReduce(
                     blockUpstreamRequest.getTableId(),
-                    schemaCacheMap.get(blockUpstreamRequest.getTableId()));
+                    schemaCacheMap.get(blockUpstreamRequest.getTableId()),
+                    true);
         } else {
             throw new IllegalArgumentException("Unexpected operator event: " + event);
         }

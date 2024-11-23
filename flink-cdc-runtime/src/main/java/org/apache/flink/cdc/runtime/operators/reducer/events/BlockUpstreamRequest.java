@@ -34,12 +34,19 @@ public class BlockUpstreamRequest implements OperatorEvent {
     /** The schema changes from which table is executing it. */
     private final TableId tableId;
 
-    public BlockUpstreamRequest(TableId tableId) {
+    private final int reduceSeqNum;
+
+    public BlockUpstreamRequest(TableId tableId, int reduceSeqNum) {
         this.tableId = tableId;
+        this.reduceSeqNum = reduceSeqNum;
     }
 
     public TableId getTableId() {
         return tableId;
+    }
+
+    public int getReduceSeqNum() {
+        return reduceSeqNum;
     }
 
     @Override
@@ -51,11 +58,11 @@ public class BlockUpstreamRequest implements OperatorEvent {
             return false;
         }
         BlockUpstreamRequest that = (BlockUpstreamRequest) o;
-        return Objects.equals(tableId, that.tableId);
+        return Objects.equals(tableId, that.tableId) && reduceSeqNum == that.reduceSeqNum;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(tableId);
+        return Objects.hash(tableId, reduceSeqNum);
     }
 }

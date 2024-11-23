@@ -22,25 +22,26 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.runtime.operators.reducer.SchemaReducer;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 
+import java.util.Map;
 import java.util.Objects;
 
 /** Mapper's request to {@link SchemaReducer} for reducing an incompatible schema. */
 public class ReduceSchemaResponse implements CoordinationResponse {
 
-    private final TableId tableId;
-    private final Schema newSchema;
+    private final Map<TableId, Schema> latestReducedSchema;
+    private final int reduceSeqNum;
 
-    public ReduceSchemaResponse(TableId tableId, Schema newSchema) {
-        this.tableId = tableId;
-        this.newSchema = newSchema;
+    public ReduceSchemaResponse(Map<TableId, Schema> latestReducedSchema, int reduceSeqNum) {
+        this.latestReducedSchema = latestReducedSchema;
+        this.reduceSeqNum = reduceSeqNum;
     }
 
-    public TableId getTableId() {
-        return tableId;
+    public Map<TableId, Schema> getLatestReducedSchema() {
+        return latestReducedSchema;
     }
 
-    public Schema getNewSchema() {
-        return newSchema;
+    public int getReduceSeqNum() {
+        return reduceSeqNum;
     }
 
     @Override
@@ -49,16 +50,22 @@ public class ReduceSchemaResponse implements CoordinationResponse {
             return false;
         }
         ReduceSchemaResponse that = (ReduceSchemaResponse) o;
-        return Objects.equals(tableId, that.tableId) && Objects.equals(newSchema, that.newSchema);
+        return Objects.equals(latestReducedSchema, that.latestReducedSchema)
+                && reduceSeqNum == that.reduceSeqNum;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(tableId, newSchema);
+        return Objects.hash(latestReducedSchema, reduceSeqNum);
     }
 
     @Override
     public String toString() {
-        return "ReduceSchemaResponse{" + "tableId=" + tableId + ", newSchema=" + newSchema + '}';
+        return "ReduceSchemaResponse{"
+                + "latestReducedSchema="
+                + latestReducedSchema
+                + ", reduceSeqNum="
+                + reduceSeqNum
+                + '}';
     }
 }

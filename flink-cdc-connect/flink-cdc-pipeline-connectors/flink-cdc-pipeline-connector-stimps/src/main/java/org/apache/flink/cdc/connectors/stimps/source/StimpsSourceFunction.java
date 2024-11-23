@@ -38,6 +38,8 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
+import java.util.function.Consumer;
 
 /** Source function for "STIMPS" testing source. */
 public class StimpsSourceFunction extends RichParallelSourceFunction<Event> {
@@ -46,8 +48,14 @@ public class StimpsSourceFunction extends RichParallelSourceFunction<Event> {
 
     private int subTaskId;
 
-    public static final TableId TABLE_ID =
-            TableId.tableId("stimps_namespace", "stimps_database", "stimps_table");
+    public static final List<TableId> TABLES =
+            Arrays.asList(
+                TableId.tableId("stimps_namespace", "stimps_database", "stimps_table_1"),
+                TableId.tableId("stimps_namespace", "stimps_database", "stimps_table_2"),
+                TableId.tableId("stimps_namespace", "stimps_database", "stimps_table_3"),
+                TableId.tableId("stimps_namespace", "stimps_database", "stimps_table_4"),
+                TableId.tableId("stimps_namespace", "stimps_database", "stimps_table_5")
+            );
 
     private static final Schema INITIAL_SCHEMA =
             Schema.newBuilder()
@@ -92,43 +100,47 @@ public class StimpsSourceFunction extends RichParallelSourceFunction<Event> {
                 "Edgeworth", "Ferris", "Gumshoe", "Harry", "IINA", "Juliet", "Kio", "Lilith"
             };
 
-    private static DataChangeEvent insert(BinaryRecordData after) {
-        return DataChangeEvent.insertEvent(TABLE_ID, after);
+    private static DataChangeEvent insert(TableId tableId, BinaryRecordData after) {
+        return DataChangeEvent.insertEvent(tableId, after);
     }
 
-    private static DataChangeEvent update(BinaryRecordData before, BinaryRecordData after) {
-        return DataChangeEvent.updateEvent(TABLE_ID, before, after);
+    private static DataChangeEvent update(TableId tableId, BinaryRecordData before, BinaryRecordData after) {
+        return DataChangeEvent.updateEvent(tableId, before, after);
     }
 
-    private static DataChangeEvent delete(BinaryRecordData before) {
-        return DataChangeEvent.deleteEvent(TABLE_ID, before);
+    private static DataChangeEvent delete(TableId tableId, BinaryRecordData before) {
+        return DataChangeEvent.deleteEvent(tableId, before);
+    }
+
+    private void sendFromTables(Consumer<TableId> tableIdConsumer) {
+        TABLES.forEach(tableIdConsumer);
     }
 
     @Override
     public void run(SourceContext<Event> context) throws InterruptedException {
-        {
+        sendFromTables(tableId -> {
             // Emits shared CreateTableEvent first
             LOG.info("{}> Emitting CreateTableEvent", subTaskId);
-            collect(context, new CreateTableEvent(TABLE_ID, INITIAL_SCHEMA));
+            collect(context, new CreateTableEvent(tableId, INITIAL_SCHEMA));
 
             BinaryRecordData event1 =
                     event(INITIAL_SCHEMA, (long) 1000 * subTaskId + 1, "Alice #" + subTaskId);
             BinaryRecordData event2 =
                     event(INITIAL_SCHEMA, (long) 1000 * subTaskId + 1, "Bob #" + subTaskId);
-            collect(context, insert(event1));
-            collect(context, update(event1, event2));
-            collect(context, delete(event2));
-        }
+            collect(context, insert(tableId, event1));
+            collect(context, update(tableId, event1, event2));
+            collect(context, delete(tableId, event2));
+        });
 
         DataType appendedColumnType = APPENDED_DATATYPES[subTaskId % APPENDED_COLUMNS_SIZE];
         Object appendedObject = APPENDED_OBJECTS[subTaskId % APPENDED_COLUMNS_SIZE];
-        {
+        sendFromTables(tableId ->{
             // Test adding conflicting columns
             Column appendedColumn = Column.physicalColumn("foo", appendedColumnType);
             collect(
                     context,
                     new AddColumnEvent(
-                            TABLE_ID,
+                            tableId,
                             Collections.singletonList(AddColumnEvent.last(appendedColumn))));
             Schema schemaV2 =
                     Schema.newBuilder()
@@ -151,18 +163,18 @@ public class StimpsSourceFunction extends RichParallelSourceFunction<Event> {
                             (long) 1000 * subTaskId + 2,
                             "Derrida #" + subTaskId,
                             appendedObject);
-            collect(context, insert(event3));
-            collect(context, update(event3, event4));
-            collect(context, delete(event4));
-        }
+            collect(context, insert(tableId, event3));
+            collect(context, update(tableId, event3, event4));
+            collect(context, delete(tableId, event4));
+        });
 
-        {
+        sendFromTables(tableId -> {
             // Test appending irrelevant columns
             Column irrelevantColumn = Column.physicalColumn("bar_" + subTaskId, DataTypes.STRING());
             collect(
                     context,
                     new AddColumnEvent(
-                            TABLE_ID,
+                            tableId,
                             Collections.singletonList(AddColumnEvent.last(irrelevantColumn))));
             Schema schemaV3 =
                     Schema.newBuilder()
@@ -189,11 +201,11 @@ public class StimpsSourceFunction extends RichParallelSourceFunction<Event> {
                                 NAMES[i] + " #" + subTaskId,
                                 appendedObject,
                                 "After after");
-                collect(context, insert(before));
-                collect(context, update(before, after));
-                collect(context, delete(after));
+                collect(context, insert(tableId, before));
+                collect(context, update(tableId, before, after));
+                collect(context, delete(tableId, after));
             }
-        }
+        });
     }
 
     @Override

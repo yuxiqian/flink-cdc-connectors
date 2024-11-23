@@ -28,10 +28,21 @@ public class ReduceSchemaRequest implements CoordinationRequest {
     private final TableId tableId;
     private final Schema schema;
 
+    public static ReduceSchemaRequest alignRequest(int subTaskId) {
+        return new ReduceSchemaRequest(subTaskId, null, null);
+    }
+
     public ReduceSchemaRequest(int subTaskId, TableId tableId, Schema schema) {
         this.subTaskId = subTaskId;
         this.tableId = tableId;
         this.schema = schema;
+    }
+
+    // Checking if this schema request was triggered by a "blockUpstreamRequest" for mapper
+    // alignment purposes, instead of an actual incompatible schema. We don't need to infer schema
+    // for those requests.
+    public boolean isAlignRequest() {
+        return tableId == null || schema == null;
     }
 
     public int getSubTaskId() {

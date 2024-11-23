@@ -165,27 +165,70 @@ public class SchemaInferencingUtils {
     }
 
     /**
+     * Generating what schema change events we need to do by converting compatible {@code
+     * beforeSchema} to {@code afterSchema}. Notice that it is guaranteed that afterSchema is
+     * compatible with beforeSchema, and only CreateTableEvent or AlterColumnTypeEvent +
+     * AddColumnEvent will be emitted
+     */
+    public static List<SchemaChangeEvent> getSchemaDifference(
+            TableId tableId, @Nullable Schema beforeSchema, Schema afterSchema) {
+        if (beforeSchema == null) {
+            return Collections.singletonList(new CreateTableEvent(tableId, afterSchema));
+        }
+
+        Map<String, Column> beforeColumns =
+                beforeSchema.getColumns().stream()
+                        .collect(Collectors.toMap(Column::getName, col -> col));
+
+        Map<String, DataType> oldTypeMapping = new HashMap<>();
+        Map<String, DataType> newTypeMapping = new HashMap<>();
+        List<AddColumnEvent.ColumnWithPosition> appendedColumns = new ArrayList<>();
+
+        for (Column afterColumn : afterSchema.getColumns()) {
+            String columnName = afterColumn.getName();
+            DataType afterType = afterColumn.getType();
+            if (beforeColumns.containsKey(columnName)) {
+                DataType beforeType = beforeColumns.get(columnName).getType();
+                if (!Objects.equals(beforeType, afterType)) {
+                    oldTypeMapping.put(columnName, beforeType);
+                    newTypeMapping.put(columnName, afterType);
+                }
+            } else {
+                appendedColumns.add(new AddColumnEvent.ColumnWithPosition(afterColumn));
+            }
+        }
+
+        List<SchemaChangeEvent> schemaChangeEvents = new ArrayList<>();
+        if (!appendedColumns.isEmpty()) {
+            schemaChangeEvents.add(new AddColumnEvent(tableId, appendedColumns));
+        }
+
+        if (!newTypeMapping.isEmpty()) {
+            schemaChangeEvents.add(
+                    new AlterColumnTypeEvent(tableId, newTypeMapping, oldTypeMapping));
+        }
+
+        return schemaChangeEvents;
+    }
+
+    /**
      * Try to merge {@code upcomingSchema} into {@code currentSchema} by performing lenient schema
      * changes. Returns evolved schema and corresponding schema change event interpretations.
      */
-    public static Tuple2<Schema, List<SchemaChangeEvent>> getLeastCommonSchema(
-            TableId tableId, @Nullable Schema currentSchema, Schema upcomingSchema) {
+    public static Schema getLeastCommonSchema(
+            @Nullable Schema currentSchema, Schema upcomingSchema) {
         // No current schema record, we need to create it first.
         if (currentSchema == null) {
-            return Tuple2.of(
-                    upcomingSchema,
-                    Collections.singletonList(new CreateTableEvent(tableId, upcomingSchema)));
+            return upcomingSchema;
         }
 
         // Current schema is compatible with upcoming ones, just return it and perform no schema
         // evolution.
         if (isSchemaCompatible(currentSchema, upcomingSchema)) {
-            return Tuple2.of(currentSchema, Collections.emptyList());
+            return currentSchema;
         }
 
-        Map<String, DataType> oldTypeMapping = new HashMap<>();
         Map<String, DataType> newTypeMapping = new HashMap<>();
-        List<AddColumnEvent.ColumnWithPosition> addedColumns = new ArrayList<>();
 
         Map<String, Column> currentColumns =
                 currentSchema.getColumns().stream()
@@ -203,12 +246,9 @@ public class SchemaInferencingUtils {
                 DataType leastCommonType =
                         getLeastCommonType(currentColumnType, upcomingColumnType);
                 if (!Objects.equals(leastCommonType, currentColumnType)) {
-                    oldTypeMapping.put(columnName, currentColumnType);
                     newTypeMapping.put(columnName, leastCommonType);
                 }
-
             } else {
-                addedColumns.add(new AddColumnEvent.ColumnWithPosition(upcomingColumn));
                 appendedColumns.add(upcomingColumn);
             }
         }
@@ -223,17 +263,7 @@ public class SchemaInferencingUtils {
         }
 
         commonColumns.addAll(appendedColumns);
-
-        List<SchemaChangeEvent> events = new ArrayList<>();
-        if (!newTypeMapping.isEmpty()) {
-            events.add(new AlterColumnTypeEvent(tableId, newTypeMapping, oldTypeMapping));
-        }
-
-        if (!addedColumns.isEmpty()) {
-            events.add(new AddColumnEvent(tableId, addedColumns));
-        }
-
-        return Tuple2.of(currentSchema.copy(commonColumns), events);
+        return currentSchema.copy(commonColumns);
     }
 
     private static DataType getLeastCommonType(DataType currentType, DataType targetType) {
