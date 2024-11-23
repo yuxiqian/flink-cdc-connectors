@@ -67,6 +67,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 import static org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils.wrap;
 
@@ -315,6 +316,14 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
     }
 
     private void broadcastFlushEventRequest(TableId tableId) {
+        // We must wait for all subTasks being successfully registered before broadcasting anything.
+        loopWhen(
+                () -> subtaskGatewayMap.size() < currentParallelism,
+                () ->
+                        LOG.info(
+                                "Not all subTasks have been registered. Expected {}, actual {}",
+                                currentParallelism,
+                                subtaskGatewayMap.keySet()));
         subtaskGatewayMap.forEach(
                 (subTaskId, gateway) -> {
                     LOG.info("Try to broadcast FlushEventRequest for {} to {}", tableId, subTaskId);
@@ -324,19 +333,13 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
 
     private void reduceSchema() {
         LOG.info("Starting to reduce schema. ");
-
-        while (flushedSinkWriters.size() < currentParallelism) {
-            // Waiting for all sink writers to flush their buffered data.
-            LOG.info(
-                    "Not all sink writers have successfully flushed. Expected {}, actual {}",
-                    currentParallelism,
-                    flushedSinkWriters);
-            try {
-                Thread.sleep(1000L);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-        }
+        loopWhen(
+                () -> flushedSinkWriters.size() < currentParallelism,
+                () ->
+                        LOG.info(
+                                "Not all sink writers have successfully flushed. Expected {}, actual {}",
+                                currentParallelism,
+                                flushedSinkWriters));
 
         LOG.info("All flushed. Going to reduce schema for pending requests: {}", pendingRequests);
 
@@ -387,6 +390,7 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
                                             schemaMapperSeqNum.incrementAndGet())));
                 });
 
+        flushedSinkWriters.clear();
         blockedUpstreamCount.set(0);
         pendingRequests.clear();
 
@@ -458,5 +462,28 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
         IDLE,
         BROADCASTING,
         EVOLVING
+    }
+
+    private void loopWhen(Supplier<Boolean> conditionChecker) {
+        while (conditionChecker.get()) {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    private void loopWhen(Supplier<Boolean> conditionChecker, Runnable message) {
+        while (conditionChecker.get()) {
+            message.run();
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException(e);
+            }
+        }
     }
 }
