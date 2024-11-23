@@ -48,8 +48,6 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import static org.apache.flink.cdc.common.types.DataTypes.BIGINT;
-
 /** Utils for {@link Schema} to perform the ability of evolution. */
 @PublicEvolving
 public class SchemaUtils {
@@ -200,7 +198,7 @@ public class SchemaUtils {
             return DataTypes.TIMESTAMP(TimestampType.MAX_PRECISION);
         } else if (lType.is(DataTypeFamily.INTEGER_NUMERIC)
                 && rType.is(DataTypeFamily.INTEGER_NUMERIC)) {
-            mergedType = BIGINT();
+            mergedType = DataTypes.BIGINT();
         } else if (lType.is(DataTypeFamily.CHARACTER_STRING)
                 && rType.is(DataTypeFamily.CHARACTER_STRING)) {
             mergedType = DataTypes.STRING();
