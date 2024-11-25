@@ -380,14 +380,12 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
             updatedSchemasMap.put(tableId, newSchema);
         }
 
+        int nextSeqNum = schemaMapperSeqNum.incrementAndGet();
         pendingRequests.forEach(
                 (subTaskId, tuple) -> {
                     LOG.info("Reducer finishes pending future from {}", subTaskId);
                     tuple.f1.complete(
-                            wrap(
-                                    new ReduceSchemaResponse(
-                                            updatedSchemasMap,
-                                            schemaMapperSeqNum.incrementAndGet())));
+                            wrap(new ReduceSchemaResponse(updatedSchemasMap, nextSeqNum)));
                 });
 
         flushedSinkWriters.clear();

@@ -65,4 +65,14 @@ public class BlockUpstreamRequest implements OperatorEvent {
     public int hashCode() {
         return Objects.hash(tableId, reduceSeqNum);
     }
+
+    @Override
+    public String toString() {
+        return "BlockUpstreamRequest{"
+                + "tableId="
+                + tableId
+                + ", reduceSeqNum="
+                + reduceSeqNum
+                + '}';
+    }
 }
