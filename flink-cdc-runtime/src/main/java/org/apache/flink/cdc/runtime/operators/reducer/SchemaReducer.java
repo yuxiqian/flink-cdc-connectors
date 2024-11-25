@@ -98,7 +98,6 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
     private transient Map<Integer, Throwable> failedReasons;
     private transient int currentParallelism;
     private transient AtomicReference<RequestStatus> reducerStatus;
-    private transient AtomicInteger blockedUpstreamCount;
     private transient Map<
                     Integer, Tuple2<ReduceSchemaRequest, CompletableFuture<CoordinationResponse>>>
             pendingRequests;
@@ -125,8 +124,7 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
         this.failedReasons = new ConcurrentHashMap<>();
         this.currentParallelism = context.currentParallelism();
         this.reducerStatus = new AtomicReference<>(RequestStatus.IDLE);
-        this.blockedUpstreamCount = new AtomicInteger(0);
-        this.pendingRequests = new HashMap<>();
+        this.pendingRequests = new ConcurrentHashMap<>();
         this.schemaMapperSeqNum = new AtomicInteger(0);
         LOG.info(
                 "Started SchemaRegistry for {}. Parallelism: {}", operatorName, currentParallelism);
@@ -259,20 +257,18 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
         LOG.info("Reducer received schema reduce request {}...", request);
         pendingRequests.put(request.getSubTaskId(), Tuple2.of(request, responseFuture));
 
-        int blockCnt = blockedUpstreamCount.incrementAndGet();
-
-        if (blockCnt == 1) {
+        if (pendingRequests.size() == 1) {
             Preconditions.checkState(
                     reducerStatus.compareAndSet(RequestStatus.IDLE, RequestStatus.BROADCASTING),
                     "Unexpected reducer status: " + reducerStatus.get());
             LOG.info(
                     "Received the very-first schema reduce request {}. Switching from IDLE to BROADCASTING.",
                     request);
-            broadcastBlockUpstreamRequest(request.getTableId(), request.getSubTaskId());
+            broadcastBlockUpstreamRequest(request.getTableId());
         }
 
         // No else if, since currentParallelism might be == 1
-        if (blockCnt == currentParallelism) {
+        if (pendingRequests.size() == currentParallelism) {
             Preconditions.checkState(
                     reducerStatus.compareAndSet(RequestStatus.BROADCASTING, RequestStatus.EVOLVING),
                     "Unexpected reducer status: " + reducerStatus.get());
@@ -315,7 +311,7 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
         }
     }
 
-    private void broadcastBlockUpstreamRequest(TableId tableId, int except) {
+    private void broadcastBlockUpstreamRequest(TableId tableId) {
         // We must wait for all subTasks being successfully registered before broadcasting anything.
         loopWhen(
                 () -> subtaskGatewayMap.size() < currentParallelism,
@@ -326,7 +322,7 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
                                 subtaskGatewayMap.keySet()));
         subtaskGatewayMap.forEach(
                 (subTaskId, gateway) -> {
-                    if (subTaskId != except) {
+                    if (!pendingRequests.containsKey(subTaskId)) {
                         LOG.info(
                                 "Try to broadcast BlockUpstreamRequest for {} to {}",
                                 tableId,
@@ -395,7 +391,6 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
                 });
 
         flushedSinkWriters.clear();
-        blockedUpstreamCount.set(0);
         pendingRequests.clear();
 
         LOG.info("Finished schema evolving. Switching from EVOLVING to IDLE.");
