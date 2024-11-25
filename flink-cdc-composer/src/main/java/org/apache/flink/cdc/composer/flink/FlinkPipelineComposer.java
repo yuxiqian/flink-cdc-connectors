@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.sink.DataSink;
+import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.composer.PipelineComposer;
 import org.apache.flink.cdc.composer.PipelineExecution;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
@@ -139,6 +140,12 @@ public class FlinkPipelineComposer implements PipelineComposer {
                 sourceTranslator.translate(
                         pipelineDef.getSource(), env, pipelineDefConfig, parallelism);
         boolean needsSchemaInferencing = sourceTranslator.needsSchemaInferencing();
+
+        if (needsSchemaInferencing) {
+            Preconditions.checkState(
+                    schemaChangeBehavior.equals(SchemaChangeBehavior.LENIENT),
+                    "Schema change behavior must be set to LENIENT for schema inferencing source.");
+        }
 
         // Source -> PreTransform
         stream =
