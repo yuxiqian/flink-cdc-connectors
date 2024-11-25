@@ -268,7 +268,7 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
             LOG.info(
                     "Received the very-first schema reduce request {}. Switching from IDLE to BROADCASTING.",
                     request);
-            broadcastFlushEventRequest(request.getTableId());
+            broadcastBlockUpstreamRequest(request.getTableId(), request.getSubTaskId());
         }
 
         // No else if, since currentParallelism might be == 1
@@ -315,7 +315,7 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
         }
     }
 
-    private void broadcastFlushEventRequest(TableId tableId) {
+    private void broadcastBlockUpstreamRequest(TableId tableId, int except) {
         // We must wait for all subTasks being successfully registered before broadcasting anything.
         loopWhen(
                 () -> subtaskGatewayMap.size() < currentParallelism,
@@ -326,8 +326,14 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
                                 subtaskGatewayMap.keySet()));
         subtaskGatewayMap.forEach(
                 (subTaskId, gateway) -> {
-                    LOG.info("Try to broadcast FlushEventRequest for {} to {}", tableId, subTaskId);
-                    gateway.sendEvent(new BlockUpstreamRequest(tableId, schemaMapperSeqNum.get()));
+                    if (subTaskId != except) {
+                        LOG.info(
+                                "Try to broadcast BlockUpstreamRequest for {} to {}",
+                                tableId,
+                                subTaskId);
+                        gateway.sendEvent(
+                                new BlockUpstreamRequest(tableId, schemaMapperSeqNum.get()));
+                    }
                 });
     }
 
