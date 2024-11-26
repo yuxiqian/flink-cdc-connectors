@@ -19,6 +19,7 @@ package org.apache.flink.cdc.common.utils;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.StringData;
@@ -38,7 +39,6 @@ import org.apache.flink.cdc.common.types.BinaryType;
 import org.apache.flink.cdc.common.types.BooleanType;
 import org.apache.flink.cdc.common.types.CharType;
 import org.apache.flink.cdc.common.types.DataType;
-import org.apache.flink.cdc.common.types.DataTypeFamily;
 import org.apache.flink.cdc.common.types.DataTypeRoot;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.DateType;
@@ -53,17 +53,22 @@ import org.apache.flink.cdc.common.types.SmallIntType;
 import org.apache.flink.cdc.common.types.TimeType;
 import org.apache.flink.cdc.common.types.TimestampType;
 import org.apache.flink.cdc.common.types.TinyIntType;
+import org.apache.flink.cdc.common.types.VarBinaryType;
 import org.apache.flink.cdc.common.types.VarCharType;
 import org.apache.flink.cdc.common.types.ZonedTimestampType;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableList;
 import org.apache.flink.shaded.guava31.com.google.common.collect.Streams;
+import org.apache.flink.shaded.guava31.com.google.common.io.BaseEncoding;
 
 import javax.annotation.Nullable;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -78,6 +83,11 @@ import java.util.stream.Collectors;
  */
 @PublicEvolving
 public class SchemaInferencingUtils {
+    /**
+     * Checking if given {@code upcomingSchema} could be fit into currently known {@code
+     * currentSchema}. Current schema could be null (as the cold opening state, and in this case it
+     * always returns {@code false}) but the upcoming schema should never be null.
+     */
     public static boolean isSchemaCompatible(
             @Nullable Schema currentSchema, Schema upcomingSchema) {
         if (currentSchema == null) {
@@ -98,117 +108,6 @@ public class SchemaInferencingUtils {
             }
         }
         return true;
-    }
-
-    private static boolean isDataTypeCompatible(
-            @Nullable DataType currentType, DataType upcomingType) {
-        // If two types are identical, they're compatible of course.
-        if (Objects.equals(currentType, upcomingType)) {
-            return true;
-        }
-
-        // Or, if an upcoming column does not exist in current schema, it can't be compatible.
-        if (currentType == null) {
-            return false;
-        }
-
-        // Or, check if upcomingType is presented in the type merging tree.
-        return TYPE_MERGING_TREE.get(upcomingType.getClass()).contains(currentType);
-    }
-
-    /**
-     * Coercing {@code upcomingRow} with {@code upcomingTypes} schema into {@code currentTypes}
-     * schema. Invoking this method implicitly assumes that {@code isSchemaCompatible(currentSchema,
-     * upcomingSchema)} returns true, and no further check will be performed here. If these
-     * preconditions are violated, unexpected things might happen!
-     */
-    public static Object[] coerceRow(
-            String timezone,
-            Schema currentSchema,
-            Schema upcomingSchema,
-            List<Object> upcomingRow) {
-        List<Column> currentColumns = currentSchema.getColumns();
-        Map<String, DataType> upcomingColumnTypes =
-                upcomingSchema.getColumns().stream()
-                        .collect(Collectors.toMap(Column::getName, Column::getType));
-        Map<String, Object> upcomingColumnObjects =
-                Streams.zip(
-                                upcomingSchema.getColumnNames().stream(),
-                                upcomingRow.stream(),
-                                Tuple2::of)
-                        .collect(Collectors.toMap(t -> t.f0, t -> t.f1));
-        Object[] coercedRow = new Object[currentSchema.getColumnCount()];
-
-        for (int i = 0; i < currentSchema.getColumnCount(); i++) {
-            Column currentColumn = currentColumns.get(i);
-            String columnName = currentColumn.getName();
-            if (upcomingColumnTypes.containsKey(columnName)) {
-
-                DataType upcomingType = upcomingColumnTypes.get(columnName);
-                DataType currentType = currentColumn.getType();
-
-                if (Objects.equals(upcomingType, currentType)) {
-                    coercedRow[i] = upcomingColumnObjects.get(columnName);
-                } else {
-                    coercedRow[i] =
-                            coerceObject(
-                                    timezone,
-                                    upcomingColumnObjects.get(columnName),
-                                    upcomingColumnTypes.get(columnName),
-                                    currentColumn.getType());
-                }
-            } else {
-                coercedRow[i] = null;
-            }
-        }
-        return coercedRow;
-    }
-
-    /**
-     * Generating what schema change events we need to do by converting compatible {@code
-     * beforeSchema} to {@code afterSchema}. Notice that it is guaranteed that afterSchema is
-     * compatible with beforeSchema, and only CreateTableEvent or AlterColumnTypeEvent +
-     * AddColumnEvent will be emitted
-     */
-    public static List<SchemaChangeEvent> getSchemaDifference(
-            TableId tableId, @Nullable Schema beforeSchema, Schema afterSchema) {
-        if (beforeSchema == null) {
-            return Collections.singletonList(new CreateTableEvent(tableId, afterSchema));
-        }
-
-        Map<String, Column> beforeColumns =
-                beforeSchema.getColumns().stream()
-                        .collect(Collectors.toMap(Column::getName, col -> col));
-
-        Map<String, DataType> oldTypeMapping = new HashMap<>();
-        Map<String, DataType> newTypeMapping = new HashMap<>();
-        List<AddColumnEvent.ColumnWithPosition> appendedColumns = new ArrayList<>();
-
-        for (Column afterColumn : afterSchema.getColumns()) {
-            String columnName = afterColumn.getName();
-            DataType afterType = afterColumn.getType();
-            if (beforeColumns.containsKey(columnName)) {
-                DataType beforeType = beforeColumns.get(columnName).getType();
-                if (!Objects.equals(beforeType, afterType)) {
-                    oldTypeMapping.put(columnName, beforeType);
-                    newTypeMapping.put(columnName, afterType);
-                }
-            } else {
-                appendedColumns.add(new AddColumnEvent.ColumnWithPosition(afterColumn));
-            }
-        }
-
-        List<SchemaChangeEvent> schemaChangeEvents = new ArrayList<>();
-        if (!appendedColumns.isEmpty()) {
-            schemaChangeEvents.add(new AddColumnEvent(tableId, appendedColumns));
-        }
-
-        if (!newTypeMapping.isEmpty()) {
-            schemaChangeEvents.add(
-                    new AlterColumnTypeEvent(tableId, newTypeMapping, oldTypeMapping));
-        }
-
-        return schemaChangeEvents;
     }
 
     /**
@@ -266,7 +165,131 @@ public class SchemaInferencingUtils {
         return currentSchema.copy(commonColumns);
     }
 
-    private static DataType getLeastCommonType(DataType currentType, DataType targetType) {
+    /**
+     * Generating what schema change events we need to do by converting compatible {@code
+     * beforeSchema} to {@code afterSchema}. Notice that it is guaranteed that afterSchema is
+     * compatible with beforeSchema, and only CreateTableEvent or AlterColumnTypeEvent +
+     * AddColumnEvent will be emitted
+     */
+    public static List<SchemaChangeEvent> getSchemaDifference(
+            TableId tableId, @Nullable Schema beforeSchema, Schema afterSchema) {
+        if (beforeSchema == null) {
+            return Collections.singletonList(new CreateTableEvent(tableId, afterSchema));
+        }
+
+        Map<String, Column> beforeColumns =
+                beforeSchema.getColumns().stream()
+                        .collect(Collectors.toMap(Column::getName, col -> col));
+
+        Map<String, DataType> oldTypeMapping = new HashMap<>();
+        Map<String, DataType> newTypeMapping = new HashMap<>();
+        List<AddColumnEvent.ColumnWithPosition> appendedColumns = new ArrayList<>();
+
+        String afterWhichColumnPosition = null;
+        for (Column afterColumn : afterSchema.getColumns()) {
+            String columnName = afterColumn.getName();
+            DataType afterType = afterColumn.getType();
+            if (beforeColumns.containsKey(columnName)) {
+                DataType beforeType = beforeColumns.get(columnName).getType();
+                if (!Objects.equals(beforeType, afterType)) {
+                    oldTypeMapping.put(columnName, beforeType);
+                    newTypeMapping.put(columnName, afterType);
+                }
+            } else {
+                if (afterWhichColumnPosition == null) {
+                    appendedColumns.add(
+                            new AddColumnEvent.ColumnWithPosition(
+                                    afterColumn, AddColumnEvent.ColumnPosition.FIRST, null));
+                } else {
+                    appendedColumns.add(
+                            new AddColumnEvent.ColumnWithPosition(
+                                    afterColumn,
+                                    AddColumnEvent.ColumnPosition.AFTER,
+                                    afterWhichColumnPosition));
+                }
+            }
+            afterWhichColumnPosition = afterColumn.getName();
+        }
+
+        List<SchemaChangeEvent> schemaChangeEvents = new ArrayList<>();
+        if (!appendedColumns.isEmpty()) {
+            schemaChangeEvents.add(new AddColumnEvent(tableId, appendedColumns));
+        }
+
+        if (!newTypeMapping.isEmpty()) {
+            schemaChangeEvents.add(
+                    new AlterColumnTypeEvent(tableId, newTypeMapping, oldTypeMapping));
+        }
+
+        return schemaChangeEvents;
+    }
+
+    /**
+     * Coercing {@code upcomingRow} with {@code upcomingTypes} schema into {@code currentTypes}
+     * schema. Invoking this method implicitly assumes that {@code isSchemaCompatible(currentSchema,
+     * upcomingSchema)} returns true, and no further check will be performed here. If these
+     * preconditions are violated, unexpected things might happen!
+     */
+    public static Object[] coerceRow(
+            String timezone,
+            Schema currentSchema,
+            Schema upcomingSchema,
+            List<Object> upcomingRow) {
+        List<Column> currentColumns = currentSchema.getColumns();
+        Map<String, DataType> upcomingColumnTypes =
+                upcomingSchema.getColumns().stream()
+                        .collect(Collectors.toMap(Column::getName, Column::getType));
+        Map<String, Object> upcomingColumnObjects =
+                Streams.zip(
+                                upcomingSchema.getColumnNames().stream(),
+                                upcomingRow.stream(),
+                                Tuple2::of)
+                        .collect(Collectors.toMap(t -> t.f0, t -> t.f1));
+        Object[] coercedRow = new Object[currentSchema.getColumnCount()];
+
+        for (int i = 0; i < currentSchema.getColumnCount(); i++) {
+            Column currentColumn = currentColumns.get(i);
+            String columnName = currentColumn.getName();
+            if (upcomingColumnTypes.containsKey(columnName)) {
+
+                DataType upcomingType = upcomingColumnTypes.get(columnName);
+                DataType currentType = currentColumn.getType();
+
+                if (Objects.equals(upcomingType, currentType)) {
+                    coercedRow[i] = upcomingColumnObjects.get(columnName);
+                } else {
+                    coercedRow[i] =
+                            coerceObject(
+                                    timezone,
+                                    upcomingColumnObjects.get(columnName),
+                                    upcomingColumnTypes.get(columnName),
+                                    currentColumn.getType());
+                }
+            } else {
+                coercedRow[i] = null;
+            }
+        }
+        return coercedRow;
+    }
+
+    @VisibleForTesting
+    static boolean isDataTypeCompatible(@Nullable DataType currentType, DataType upcomingType) {
+        // If two types are identical, they're compatible of course.
+        if (Objects.equals(currentType, upcomingType)) {
+            return true;
+        }
+
+        // Or, if an upcoming column does not exist in current schema, it can't be compatible.
+        if (currentType == null) {
+            return false;
+        }
+
+        // Or, check if upcomingType is presented in the type merging tree.
+        return TYPE_MERGING_TREE.get(upcomingType.getClass()).contains(currentType);
+    }
+
+    @VisibleForTesting
+    static DataType getLeastCommonType(DataType currentType, DataType targetType) {
         if (Objects.equals(currentType, targetType)) {
             return currentType;
         }
@@ -283,7 +306,8 @@ public class SchemaInferencingUtils {
         return DataTypes.STRING();
     }
 
-    public static Object coerceObject(
+    @VisibleForTesting
+    static Object coerceObject(
             String timezone,
             Object originalField,
             DataType originalType,
@@ -291,94 +315,266 @@ public class SchemaInferencingUtils {
         if (originalField == null) {
             return null;
         }
-        if (destinationType.is(DataTypeRoot.BIGINT)) {
-            if (originalField instanceof Byte) {
-                // TINYINT
-                return ((Byte) originalField).longValue();
-            } else if (originalField instanceof Short) {
-                // SMALLINT
-                return ((Short) originalField).longValue();
-            } else if (originalField instanceof Integer) {
-                // INT
-                return ((Integer) originalField).longValue();
-            } else if (originalField instanceof Long) {
-                // BIGINT
-                return originalField;
-            } else {
-                throw new IllegalArgumentException(
-                        String.format(
-                                "Cannot fit type \"%s\" into a BIGINT column. "
-                                        + "Currently only TINYINT / SMALLINT / INT / LONG can be accepted by a BIGINT column",
-                                originalField.getClass()));
-            }
-        } else if (destinationType instanceof DecimalType) {
+
+        if (destinationType instanceof BooleanType) {
+            return Boolean.valueOf(originalField.toString());
+        }
+
+        if (destinationType instanceof TinyIntType) {
+            return coerceToByte(originalField);
+        }
+
+        if (destinationType instanceof SmallIntType) {
+            return coerceToShort(originalField);
+        }
+
+        if (destinationType instanceof IntType) {
+            return coerceToInt(originalField);
+        }
+
+        if (destinationType instanceof BigIntType) {
+            return coerceToLong(originalField);
+        }
+
+        if (destinationType instanceof DecimalType) {
             DecimalType decimalType = (DecimalType) destinationType;
-            BigDecimal decimalValue;
-            if (originalField instanceof Byte) {
-                decimalValue = BigDecimal.valueOf(((Byte) originalField).longValue(), 0);
-            } else if (originalField instanceof Short) {
-                decimalValue = BigDecimal.valueOf(((Short) originalField).longValue(), 0);
-            } else if (originalField instanceof Integer) {
-                decimalValue = BigDecimal.valueOf(((Integer) originalField).longValue(), 0);
-            } else if (originalField instanceof Long) {
-                decimalValue = BigDecimal.valueOf((Long) originalField, 0);
-            } else if (originalField instanceof DecimalData) {
-                decimalValue = ((DecimalData) originalField).toBigDecimal();
-            } else {
+            return coerceToDecimal(
+                    originalField, decimalType.getPrecision(), decimalType.getScale());
+        }
+
+        if (destinationType instanceof FloatType) {
+            return coerceToFloat(originalField);
+        }
+
+        if (destinationType instanceof DoubleType) {
+            return coerceToDouble(originalField);
+        }
+
+        if (destinationType instanceof CharType) {
+            return coerceToString(originalField, originalType);
+        }
+
+        if (destinationType instanceof VarCharType) {
+            return coerceToString(originalField, originalType);
+        }
+
+        if (destinationType instanceof BinaryType) {
+            return coerceToBytes(originalField);
+        }
+
+        if (destinationType instanceof VarBinaryType) {
+            return coerceToBytes(originalField);
+        }
+
+        if (destinationType instanceof DateType) {
+            try {
+                return coerceToLong(originalField);
+            } catch (IllegalArgumentException e) {
                 throw new IllegalArgumentException(
-                        String.format(
-                                "Cannot fit type \"%s\" into a DECIMAL column. "
-                                        + "Currently only BYTE / SHORT / INT / LONG / DECIMAL can be accepted by a DECIMAL column",
-                                originalField.getClass()));
+                        String.format("Cannot fit \"%s\" into a DATE column.", originalField));
             }
-            return decimalValue != null
-                    ? DecimalData.fromBigDecimal(
-                            decimalValue, decimalType.getPrecision(), decimalType.getScale())
-                    : null;
-        } else if (destinationType.is(DataTypeFamily.APPROXIMATE_NUMERIC)) {
-            if (originalField instanceof Float) {
-                // FLOAT
-                return ((Float) originalField).doubleValue();
-            } else {
-                throw new IllegalArgumentException(
-                        String.format(
-                                "Cannot fit type \"%s\" into a DOUBLE column. "
-                                        + "Currently only FLOAT can be accepted by a DOUBLE column",
-                                originalField.getClass()));
-            }
-        } else if (destinationType.is(DataTypeRoot.VARCHAR)) {
-            if (originalField instanceof StringData) {
-                return originalField;
-            } else {
-                return BinaryStringData.fromString(originalField.toString());
-            }
-        } else if (destinationType.is(DataTypeRoot.TIMESTAMP_WITHOUT_TIME_ZONE)
+        }
+
+        if (destinationType.is(DataTypeRoot.TIMESTAMP_WITHOUT_TIME_ZONE)
                 && originalType.is(DataTypeRoot.TIMESTAMP_WITHOUT_TIME_ZONE)) {
             // For now, TimestampData / ZonedTimestampData / LocalZonedTimestampData has no
             // difference in its internal representation, so there's no need to do any precision
             // conversion.
             return originalField;
-        } else if (destinationType.is(DataTypeRoot.TIMESTAMP_WITH_TIME_ZONE)
+        }
+
+        if (destinationType.is(DataTypeRoot.TIMESTAMP_WITH_TIME_ZONE)
                 && originalType.is(DataTypeRoot.TIMESTAMP_WITH_TIME_ZONE)) {
             return originalField;
-        } else if (destinationType.is(DataTypeRoot.TIMESTAMP_WITH_LOCAL_TIME_ZONE)
+        }
+
+        if (destinationType.is(DataTypeRoot.TIMESTAMP_WITH_LOCAL_TIME_ZONE)
                 && originalType.is(DataTypeRoot.TIMESTAMP_WITH_LOCAL_TIME_ZONE)) {
             return originalField;
-        } else if (destinationType.is(DataTypeFamily.TIMESTAMP)
-                && originalType.is(DataTypeFamily.TIMESTAMP)) {
-            return castToTimestamp(originalField, timezone);
+        }
+
+        if (destinationType instanceof TimestampType) {
+            return coerceToTimestamp(originalField, timezone);
+        }
+
+        if (destinationType instanceof LocalZonedTimestampType) {
+            return coerceToLocalZonedTimestamp(originalField, timezone);
+        }
+
+        if (destinationType instanceof ZonedTimestampType) {
+            return coerceToZonedTimestamp(originalField, timezone);
+        }
+
+        throw new IllegalArgumentException(
+                String.format(
+                        "Column type \"%s\" doesn't support type coercion to \"%s\"",
+                        originalType, destinationType));
+    }
+
+    private static Object coerceToString(Object originalField, DataType originalType) {
+        if (originalField == null) {
+            return BinaryStringData.fromString("null");
+        }
+
+        if (originalType instanceof DateType) {
+            long epochOfDay = coerceToLong(originalField);
+            return BinaryStringData.fromString(LocalDate.ofEpochDay(epochOfDay).toString());
+        }
+
+        if (originalField instanceof StringData) {
+            return originalField;
+        }
+
+        if (originalField instanceof byte[]) {
+            return BinaryStringData.fromString(hexlify((byte[]) originalField));
+        }
+
+        return BinaryStringData.fromString(originalField.toString());
+    }
+
+    private static Object coerceToBytes(Object originalField) {
+        if (originalField instanceof byte[]) {
+            return originalField;
         } else {
-            throw new IllegalArgumentException(
-                    String.format(
-                            "Column type \"%s\" doesn't support type coercion", destinationType));
+            return originalField.toString().getBytes();
         }
     }
 
-    private static TimestampData castToTimestamp(Object object, String timezone) {
+    private static byte coerceToByte(Object o) {
+        if (o instanceof Byte) {
+            return (Byte) o;
+        } else {
+            throw new IllegalArgumentException(
+                    String.format("Cannot fit type \"%s\" into a TINYINT column. ", o.getClass()));
+        }
+    }
+
+    private static short coerceToShort(Object o) {
+        if (o instanceof Byte) {
+            return ((Byte) o).shortValue();
+        } else if (o instanceof Short) {
+            return (Short) o;
+        } else {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Cannot fit type \"%s\" into a SMALLINT column. "
+                                    + "Currently only TINYINT can be accepted by a SMALLINT column",
+                            o.getClass()));
+        }
+    }
+
+    private static int coerceToInt(Object o) {
+        if (o instanceof Byte) {
+            return ((Byte) o).intValue();
+        } else if (o instanceof Short) {
+            return ((Short) o).intValue();
+        } else if (o instanceof Integer) {
+            return (Integer) o;
+        } else {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Cannot fit type \"%s\" into a INT column. "
+                                    + "Currently only TINYINT / SMALLINT can be accepted by a INT column",
+                            o.getClass()));
+        }
+    }
+
+    private static long coerceToLong(Object o) {
+        if (o instanceof Byte) {
+            return ((Byte) o).longValue();
+        } else if (o instanceof Short) {
+            return ((Short) o).longValue();
+        } else if (o instanceof Integer) {
+            return ((Integer) o).longValue();
+        } else if (o instanceof Long) {
+            return (long) o;
+        } else {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Cannot fit type \"%s\" into a BIGINT column. "
+                                    + "Currently only TINYINT / SMALLINT / INT can be accepted by a BIGINT column",
+                            o.getClass()));
+        }
+    }
+
+    private static DecimalData coerceToDecimal(Object o, int precision, int scale) {
+        BigDecimal decimalValue;
+        if (o instanceof Byte) {
+            decimalValue = BigDecimal.valueOf(((Byte) o).longValue(), 0);
+        } else if (o instanceof Short) {
+            decimalValue = BigDecimal.valueOf(((Short) o).longValue(), 0);
+        } else if (o instanceof Integer) {
+            decimalValue = BigDecimal.valueOf(((Integer) o).longValue(), 0);
+        } else if (o instanceof Long) {
+            decimalValue = BigDecimal.valueOf((Long) o, 0);
+        } else if (o instanceof DecimalData) {
+            decimalValue = ((DecimalData) o).toBigDecimal();
+        } else {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Cannot fit type \"%s\" into a DECIMAL column. "
+                                    + "Currently only TINYINT / SMALLINT / INT / BIGINT / DECIMAL can be accepted by a DECIMAL column",
+                            o.getClass()));
+        }
+        return decimalValue != null
+                ? DecimalData.fromBigDecimal(decimalValue, precision, scale)
+                : null;
+    }
+
+    private static float coerceToFloat(Object o) {
+        if (o instanceof Byte) {
+            return ((Byte) o).floatValue();
+        } else if (o instanceof Short) {
+            return ((Short) o).floatValue();
+        } else if (o instanceof Integer) {
+            return ((Integer) o).floatValue();
+        } else if (o instanceof Long) {
+            return ((Long) o).floatValue();
+        } else if (o instanceof DecimalData) {
+            return ((DecimalData) o).toBigDecimal().floatValue();
+        } else if (o instanceof Float) {
+            return (Float) o;
+        } else {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Cannot fit type \"%s\" into a FLOAT column. "
+                                    + "Currently only TINYINT / SMALLINT / INT / BIGINT / DECIMAL can be accepted by a FLOAT column",
+                            o.getClass()));
+        }
+    }
+
+    private static double coerceToDouble(Object o) {
+        if (o instanceof Byte) {
+            return ((Byte) o).doubleValue();
+        } else if (o instanceof Short) {
+            return ((Short) o).doubleValue();
+        } else if (o instanceof Integer) {
+            return ((Integer) o).doubleValue();
+        } else if (o instanceof Long) {
+            return ((Long) o).doubleValue();
+        } else if (o instanceof DecimalData) {
+            return ((DecimalData) o).toBigDecimal().doubleValue();
+        } else if (o instanceof Float) {
+            return ((Float) o).doubleValue();
+        } else if (o instanceof Double) {
+            return (Double) o;
+        } else {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Cannot fit type \"%s\" into a DOUBLE column. "
+                                    + "Currently only TINYINT / SMALLINT / INT / BIGINT / DECIMAL / FLOAT can be accepted by a DOUBLE column",
+                            o.getClass()));
+        }
+    }
+
+    private static TimestampData coerceToTimestamp(Object object, String timezone) {
         if (object == null) {
             return null;
         }
-        if (object instanceof LocalZonedTimestampData) {
+        if (object instanceof Long) {
+            return TimestampData.fromLocalDateTime(
+                    LocalDate.ofEpochDay((long) object).atStartOfDay());
+        } else if (object instanceof LocalZonedTimestampData) {
             return TimestampData.fromLocalDateTime(
                     LocalDateTime.ofInstant(
                             ((LocalZonedTimestampData) object).toInstant(), ZoneId.of(timezone)));
@@ -386,6 +582,8 @@ public class SchemaInferencingUtils {
             return TimestampData.fromLocalDateTime(
                     LocalDateTime.ofInstant(
                             ((ZonedTimestampData) object).toInstant(), ZoneId.of(timezone)));
+        } else if (object instanceof TimestampData) {
+            return (TimestampData) object;
         } else {
             throw new IllegalArgumentException(
                     String.format(
@@ -393,7 +591,34 @@ public class SchemaInferencingUtils {
         }
     }
 
-    public static final Map<Class<? extends DataType>, List<DataType>> TYPE_MERGING_TREE =
+    private static LocalZonedTimestampData coerceToLocalZonedTimestamp(
+            Object object, String timezone) {
+        if (object == null) {
+            return null;
+        }
+
+        TimestampData timestampData = coerceToTimestamp(object, timezone);
+        return LocalZonedTimestampData.fromEpochMillis(
+                timestampData.getMillisecond(), timestampData.getNanoOfMillisecond());
+    }
+
+    private static ZonedTimestampData coerceToZonedTimestamp(Object object, String timezone) {
+        if (object == null) {
+            return null;
+        }
+
+        TimestampData timestampData = coerceToTimestamp(object, timezone);
+        return ZonedTimestampData.fromZonedDateTime(
+                ZonedDateTime.ofInstant(
+                        timestampData.toLocalDateTime().toInstant(ZoneOffset.UTC),
+                        ZoneId.of(timezone)));
+    }
+
+    private static String hexlify(byte[] bytes) {
+        return BaseEncoding.base64().encode(bytes);
+    }
+
+    private static final Map<Class<? extends DataType>, List<DataType>> TYPE_MERGING_TREE =
             getTypeMergingTree();
 
     private static Map<Class<? extends DataType>, List<DataType>> getTypeMergingTree() {
