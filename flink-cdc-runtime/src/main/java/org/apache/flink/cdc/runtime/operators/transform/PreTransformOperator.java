@@ -66,10 +66,12 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
     private static final long serialVersionUID = 1L;
 
     private final List<TransformRule> transformRules;
-    private transient List<PreTransformer> transforms;
     private final Map<TableId, PreTransformChangeInfo> preTransformChangeInfoMap;
     private final List<Tuple2<Selectors, SchemaMetadataTransform>> schemaMetadataTransformers;
+    private final boolean needsSchemaInferencing;
+
     private transient ListState<byte[]> state;
+    private transient List<PreTransformer> transforms;
     private final List<Tuple3<String, String, Map<String, String>>> udfFunctions;
     private List<UserDefinedFunctionDescriptor> udfDescriptors;
     private Map<TableId, PreTransformProcessor> preTransformProcessorMap;
@@ -81,8 +83,8 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
 
     /** Builder of {@link PreTransformOperator}. */
     public static class Builder {
+        private boolean needsSchemaInferencing;
         private final List<TransformRule> transformRules = new ArrayList<>();
-
         private final List<Tuple3<String, String, Map<String, String>>> udfFunctions =
                 new ArrayList<>();
 
@@ -116,20 +118,27 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
             return this;
         }
 
+        public PreTransformOperator.Builder needsSchemaInferencing(boolean needsSchemaInferencing) {
+            this.needsSchemaInferencing = needsSchemaInferencing;
+            return this;
+        }
+
         public PreTransformOperator build() {
-            return new PreTransformOperator(transformRules, udfFunctions);
+            return new PreTransformOperator(transformRules, udfFunctions, needsSchemaInferencing);
         }
     }
 
     private PreTransformOperator(
             List<TransformRule> transformRules,
-            List<Tuple3<String, String, Map<String, String>>> udfFunctions) {
+            List<Tuple3<String, String, Map<String, String>>> udfFunctions,
+            boolean needsSchemaInferencing) {
         this.transformRules = transformRules;
         this.preTransformChangeInfoMap = new ConcurrentHashMap<>();
         this.preTransformProcessorMap = new ConcurrentHashMap<>();
         this.schemaMetadataTransformers = new ArrayList<>();
         this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.udfFunctions = udfFunctions;
+        this.needsSchemaInferencing = needsSchemaInferencing;
     }
 
     @Override
@@ -172,6 +181,12 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
     @Override
     public void initializeState(StateInitializationContext context) throws Exception {
         super.initializeState(context);
+
+        // PreTransformOperator does not maintain schema in inferencing mode.
+        if (needsSchemaInferencing) {
+            return;
+        }
+
         OperatorStateStore stateStore = context.getOperatorStateStore();
         ListStateDescriptor<byte[]> descriptor =
                 new ListStateDescriptor<>("originalSchemaState", byte[].class);
@@ -202,6 +217,10 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
     @Override
     public void snapshotState(StateSnapshotContext context) throws Exception {
         super.snapshotState(context);
+        // PreTransformOperator does not maintain schema in inferencing mode.
+        if (needsSchemaInferencing) {
+            return;
+        }
         state.update(
                 new ArrayList<>(
                         preTransformChangeInfoMap.values().stream()

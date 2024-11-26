@@ -46,7 +46,8 @@ public class TransformTranslator {
             DataStream<Event> input,
             List<TransformDef> transforms,
             List<UdfDef> udfFunctions,
-            List<ModelDef> models) {
+            List<ModelDef> models,
+            boolean needsSchemaInferencing) {
         if (transforms.isEmpty()) {
             return input;
         }
@@ -62,11 +63,13 @@ public class TransformTranslator {
                     transform.getPartitionKeys(),
                     transform.getTableOptions());
         }
-
-        preTransformFunctionBuilder.addUdfFunctions(
-                udfFunctions.stream().map(this::udfDefToUDFTuple).collect(Collectors.toList()));
-        preTransformFunctionBuilder.addUdfFunctions(
-                models.stream().map(this::modelToUDFTuple).collect(Collectors.toList()));
+        preTransformFunctionBuilder
+                .addUdfFunctions(
+                        udfFunctions.stream().map(this::udfDefToUDFTuple).collect(Collectors.toList()));
+                                preTransformFunctionBuilder.addUdfFunctions(
+                models.stream().map(this::modelToUDFTuple)
+                                .collect(Collectors.toList()))
+                .needsSchemaInferencing(needsSchemaInferencing);
         return input.transform(
                 "Transform:Schema", new EventTypeInfo(), preTransformFunctionBuilder.build());
     }

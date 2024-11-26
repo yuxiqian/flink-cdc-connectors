@@ -150,7 +150,11 @@ public class FlinkPipelineComposer implements PipelineComposer {
         // Source -> PreTransform
         stream =
                 transformTranslator.translatePreTransform(
-                        stream, pipelineDef.getTransforms(), pipelineDef.getUdfs(), pipelineDef.getModels());
+                        stream,
+                        pipelineDef.getTransforms(),
+                        pipelineDef.getUdfs(),
+                        pipelineDef.getModels(),
+                        needsSchemaInferencing);
 
         // PreTransform -> PostTransform
         stream =
