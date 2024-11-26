@@ -26,8 +26,8 @@ import org.apache.flink.cdc.common.data.MapData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.schema.Column;
-import org.apache.flink.cdc.common.types.BigIntType;
 import org.apache.flink.cdc.common.types.ArrayType;
+import org.apache.flink.cdc.common.types.BigIntType;
 import org.apache.flink.cdc.common.types.BinaryType;
 import org.apache.flink.cdc.common.types.BooleanType;
 import org.apache.flink.cdc.common.types.CharType;
@@ -39,14 +39,12 @@ import org.apache.flink.cdc.common.types.DoubleType;
 import org.apache.flink.cdc.common.types.FloatType;
 import org.apache.flink.cdc.common.types.IntType;
 import org.apache.flink.cdc.common.types.LocalZonedTimestampType;
-import org.apache.flink.cdc.common.types.DecimalType;
 import org.apache.flink.cdc.common.types.MapType;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.common.types.SmallIntType;
 import org.apache.flink.cdc.common.types.TimeType;
 import org.apache.flink.cdc.common.types.TimestampType;
 import org.apache.flink.cdc.common.types.TinyIntType;
-import org.apache.flink.cdc.common.types.TimestampType;
 import org.apache.flink.cdc.common.types.VarBinaryType;
 import org.apache.flink.cdc.common.types.VarCharType;
 import org.apache.flink.cdc.common.types.ZonedTimestampType;
@@ -302,15 +300,13 @@ public class DataTypeConverter {
                 return typeFactory.createSqlType(SqlTypeName.CHAR, charType.getLength());
             case VARCHAR:
                 VarCharType varCharType = (VarCharType) dataType;
-                return typeFactory.createSqlType(
-                        SqlTypeName.VARCHAR, varCharType.getLength());
+                return typeFactory.createSqlType(SqlTypeName.VARCHAR, varCharType.getLength());
             case BINARY:
                 BinaryType binaryType = (BinaryType) dataType;
                 return typeFactory.createSqlType(SqlTypeName.BINARY, binaryType.getLength());
             case VARBINARY:
                 VarBinaryType varBinaryType = (VarBinaryType) dataType;
-                return typeFactory.createSqlType(
-                        SqlTypeName.VARBINARY, varBinaryType.getLength());
+                return typeFactory.createSqlType(SqlTypeName.VARBINARY, varBinaryType.getLength());
             case DECIMAL:
                 DecimalType decimalType = (DecimalType) dataType;
                 return typeFactory.createSqlType(
