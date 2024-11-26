@@ -48,6 +48,7 @@ public class PartitioningTranslator {
                         "PrePartition",
                         new PartitioningEventTypeInfo(),
                         new PrePartitionOperator(
+                                schemaOperatorID,
                                 downstreamParallelism,
                                 hashFunctionProvider,
                                 needsSchemaInferencing))

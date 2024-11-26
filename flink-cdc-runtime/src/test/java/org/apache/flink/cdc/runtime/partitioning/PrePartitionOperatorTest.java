@@ -27,12 +27,11 @@ import org.apache.flink.cdc.common.sink.DefaultDataChangeEventHashFunctionProvid
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.runtime.testutils.operators.EventOperatorTestHarness;
+import org.apache.flink.cdc.runtime.testutils.schema.TestingSchemaRegistryGateway;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
 import org.junit.jupiter.api.Test;
-
-import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -95,13 +94,10 @@ class PrePartitionOperatorTest {
                 createTestHarness()) {
             // Initialization
             testHarness.open();
+            testHarness.registerTableSchema(CUSTOMERS, CUSTOMERS_SCHEMA);
 
-            // CreateTableEvent
+            // DataChangeEvent
             PrePartitionOperator operator = testHarness.getOperator();
-            operator.processElement(
-                    new StreamRecord<>(new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA)));
-
-            // DataChangeEvents
             BinaryRecordDataGenerator recordDataGenerator =
                     new BinaryRecordDataGenerator(((RowType) CUSTOMERS_SCHEMA.toRowDataType()));
             DataChangeEvent eventA =
@@ -116,19 +112,6 @@ class PrePartitionOperatorTest {
                                     new Object[] {2, new BinaryStringData("Bob"), 12345689L}));
             operator.processElement(new StreamRecord<>(eventA));
             operator.processElement(new StreamRecord<>(eventB));
-
-            // CreateTableEvent will be broadcast to all sinks
-            IntStream.range(0, DOWNSTREAM_PARALLELISM)
-                    .forEach(
-                            i ->
-                                    assertThat(testHarness.getOutputRecords().poll())
-                                            .isEqualTo(
-                                                    new StreamRecord<>(
-                                                            new PartitioningEvent(
-                                                                    new CreateTableEvent(
-                                                                            CUSTOMERS,
-                                                                            CUSTOMERS_SCHEMA),
-                                                                    i))));
             assertThat(testHarness.getOutputRecords().poll())
                     .isEqualTo(
                             new StreamRecord<>(
@@ -154,7 +137,9 @@ class PrePartitionOperatorTest {
     private EventOperatorTestHarness<PrePartitionOperator, PartitioningEvent> createTestHarness() {
         PrePartitionOperator operator =
                 new PrePartitionOperator(
-                        DOWNSTREAM_PARALLELISM, new DefaultDataChangeEventHashFunctionProvider());
+                        TestingSchemaRegistryGateway.SCHEMA_OPERATOR_ID,
+                        DOWNSTREAM_PARALLELISM,
+                        new DefaultDataChangeEventHashFunctionProvider());
         return new EventOperatorTestHarness<>(operator, DOWNSTREAM_PARALLELISM);
     }
 }
