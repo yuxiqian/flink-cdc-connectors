@@ -65,10 +65,11 @@ public class TransformTranslator {
         }
         preTransformFunctionBuilder
                 .addUdfFunctions(
-                        udfFunctions.stream().map(this::udfDefToUDFTuple).collect(Collectors.toList()));
-                                preTransformFunctionBuilder.addUdfFunctions(
-                models.stream().map(this::modelToUDFTuple)
+                        udfFunctions.stream()
+                                .map(this::udfDefToUDFTuple)
                                 .collect(Collectors.toList()))
+                .addUdfFunctions(
+                        models.stream().map(this::modelToUDFTuple).collect(Collectors.toList()))
                 .needsSchemaInferencing(needsSchemaInferencing);
         return input.transform(
                 "Transform:Schema", new EventTypeInfo(), preTransformFunctionBuilder.build());
@@ -97,11 +98,14 @@ public class TransformTranslator {
                         transform.getTableOptions());
             }
         }
-        postTransformFunctionBuilder.addTimezone(timezone);
-        postTransformFunctionBuilder.addUdfFunctions(
-                udfFunctions.stream().map(this::udfDefToUDFTuple).collect(Collectors.toList()));
-        postTransformFunctionBuilder.addUdfFunctions(
-                models.stream().map(this::modelToUDFTuple).collect(Collectors.toList()));
+        postTransformFunctionBuilder
+                .addTimezone(timezone)
+                .addUdfFunctions(
+                        udfFunctions.stream()
+                                .map(this::udfDefToUDFTuple)
+                                .collect(Collectors.toList()))
+                .addUdfFunctions(
+                        models.stream().map(this::modelToUDFTuple).collect(Collectors.toList()));
         return input.transform(
                 "Transform:Data", new EventTypeInfo(), postTransformFunctionBuilder.build());
     }
