@@ -111,7 +111,7 @@ public class DataTypeConverter {
             case VARBINARY:
                 return byte[].class;
             case DECIMAL:
-                return BigDecimal.class;
+                return DecimalData.class;
             case ROW:
                 return Object.class;
             case ARRAY:
