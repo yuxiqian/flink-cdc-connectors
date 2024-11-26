@@ -44,7 +44,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /** IT cases for {@link MySqlMetadataAccessor}. */
 public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
 
-    private final UniqueDatabase fullTypesMySql57Database =
+    private final UniqueDatabase fullTypesMySqlDatabase =
             new UniqueDatabase(
                     MYSQL_CONTAINER,
                     "column_type_test",
@@ -63,25 +63,25 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
 
     @Test
     public void testMysqlAccessDatabaseAndTable() {
-        testAccessDatabaseAndTable(fullTypesMySql57Database);
+        testAccessDatabaseAndTable(fullTypesMySqlDatabase);
     }
 
     @Test
     public void testMysqlAccessCommonTypesSchema() {
-        testAccessCommonTypesSchema(fullTypesMySql57Database);
+        testAccessCommonTypesSchema(fullTypesMySqlDatabase);
     }
 
     @Test
     public void testMysqlAccessTimeTypesSchema() {
-        fullTypesMySql57Database.createAndInitialize();
+        fullTypesMySqlDatabase.createAndInitialize();
 
         String[] tables = new String[] {"time_types"};
         MySqlMetadataAccessor metadataAccessor =
-                getMetadataAccessor(tables, fullTypesMySql57Database);
+                getMetadataAccessor(tables, fullTypesMySqlDatabase);
 
         Schema actualSchema =
                 metadataAccessor.getTableSchema(
-                        TableId.tableId(fullTypesMySql57Database.getDatabaseName(), "time_types"));
+                        TableId.tableId(fullTypesMySqlDatabase.getDatabaseName(), "time_types"));
         Schema expectedSchema =
                 Schema.newBuilder()
                         .primaryKey("id")
@@ -119,16 +119,16 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
 
     @Test
     public void testMysqlPrecisionTypesSchema() {
-        fullTypesMySql57Database.createAndInitialize();
+        fullTypesMySqlDatabase.createAndInitialize();
 
         String[] tables = new String[] {"precision_types"};
         MySqlMetadataAccessor metadataAccessor =
-                getMetadataAccessor(tables, fullTypesMySql57Database);
+                getMetadataAccessor(tables, fullTypesMySqlDatabase);
 
         Schema actualSchema =
                 metadataAccessor.getTableSchema(
                         TableId.tableId(
-                                fullTypesMySql57Database.getDatabaseName(), "precision_types"));
+                                fullTypesMySqlDatabase.getDatabaseName(), "precision_types"));
         Schema expectedSchema =
                 Schema.newBuilder()
                         .primaryKey("id")
