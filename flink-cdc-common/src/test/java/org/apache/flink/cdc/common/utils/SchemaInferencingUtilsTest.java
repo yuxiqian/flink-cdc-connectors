@@ -113,11 +113,7 @@ class SchemaInferencingUtilsTest {
                     BIGINT,
                     17L,
                     DECIMAL,
-                    Objects.requireNonNull(
-                            DecimalData.fromBigDecimal(
-                                    BigDecimal.valueOf(17),
-                                    DecimalType.MAX_PRECISION,
-                                    DecimalType.DEFAULT_SCALE)),
+                    decOf(17),
                     FLOAT,
                     17.0f,
                     DOUBLE,
