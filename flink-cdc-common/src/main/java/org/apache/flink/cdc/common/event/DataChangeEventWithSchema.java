@@ -103,7 +103,7 @@ public class DataChangeEventWithSchema implements ChangeEvent, Serializable {
                             .collect(Collectors.joining(", "));
         }
         return String.format(
-                "DataChangeEventWithSchema{schema=%s, before=[%s], after=[%s], op=%s, meta=%s}",
-                schema, before, after, dataChangeEvent.op(), dataChangeEvent.meta());
+                "DataChangeEventWithSchema{tableId=%s, schema=%s, before=[%s], after=[%s], op=%s, meta=%s}",
+                tableId(), schema, before, after, dataChangeEvent.op(), dataChangeEvent.meta());
     }
 }
