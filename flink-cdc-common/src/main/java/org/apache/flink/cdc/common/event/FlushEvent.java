@@ -21,4 +21,12 @@ package org.apache.flink.cdc.common.event;
  * An {@link Event} from {@code SchemaOperator} to notify {@code DataSinkWriterOperator} that it
  * start flushing.
  */
-public class FlushEvent implements Event {}
+public class FlushEvent implements Event {
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        return o instanceof FlushEvent;
+    }
+}

@@ -68,7 +68,7 @@ public abstract class PipelineTestEnvironment extends TestLogger {
 
     @Parameterized.Parameter public String flinkVersion;
 
-    public Integer parallelism = 4;
+    public Integer parallelism = 1;
 
     // ------------------------------------------------------------------------------------------
     // Flink Variables

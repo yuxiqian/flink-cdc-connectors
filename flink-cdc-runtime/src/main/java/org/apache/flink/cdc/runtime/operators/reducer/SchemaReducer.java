@@ -244,6 +244,9 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
             Preconditions.checkState(
                     reducerStatus.compareAndSet(RequestStatus.BROADCASTING, RequestStatus.EVOLVING),
                     "Unexpected reducer status: " + reducerStatus.get());
+            LOG.info(
+                    "Received the last required schema reduce request {}. Switching from BROADCASTING to EVOLVING.",
+                    request);
             startSchemaChangesReduce();
         }
     }

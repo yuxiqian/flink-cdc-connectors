@@ -55,7 +55,7 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
     protected static final String MYSQL_TEST_USER = "mysqluser";
     protected static final String MYSQL_TEST_PASSWORD = "mysqlpw";
     protected static final String INTER_CONTAINER_MYSQL_ALIAS = "mysql";
-    protected static final long EVENT_WAITING_TIMEOUT = 60000L;
+    protected static final long EVENT_WAITING_TIMEOUT = 20000L; // TODO: REVERT THIS
 
     @ClassRule
     public static final MySqlContainer MYSQL =
@@ -617,6 +617,11 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
             Thread.sleep(1000);
         }
         if (!result) {
+            System.err.println("=============");
+            System.err.println("TM Log: " + taskManagerConsumer.toUtf8String());
+            System.err.println("=============");
+            System.err.println("JM Log: " + jobManagerConsumer.toUtf8String());
+            System.err.println("=============");
             throw new TimeoutException(
                     "failed to get specific event: "
                             + event

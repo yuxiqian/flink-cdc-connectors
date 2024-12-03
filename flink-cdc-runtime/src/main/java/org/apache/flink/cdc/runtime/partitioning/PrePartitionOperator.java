@@ -75,6 +75,7 @@ public class PrePartitionOperator extends AbstractStreamOperator<PartitioningEve
     @Override
     public void processElement(StreamRecord<Event> element) throws Exception {
         Event event = element.getValue();
+        System.out.printf("%d> Pre Partition ::: Received a raw event %s\n", subTaskId, element);
         if (event instanceof SchemaChangeEvent) {
             SchemaChangeEvent schemaChangeEvent = (SchemaChangeEvent) event;
             TableId tableId = schemaChangeEvent.tableId();
@@ -92,14 +93,14 @@ public class PrePartitionOperator extends AbstractStreamOperator<PartitioningEve
             broadcastEvent(event);
         } else if (event instanceof DataChangeEvent) {
             // Partition DataChangeEvent by table ID and primary keys
-            partitionBy(((DataChangeEvent) event));
+            partitionBy((DataChangeEvent) event);
         } else {
             throw new IllegalStateException(
                     subTaskId + "> PrePartition operator received an unexpected event: " + event);
         }
     }
 
-    private void partitionBy(DataChangeEvent dataChangeEvent) throws Exception {
+    private void partitionBy(DataChangeEvent dataChangeEvent) {
         output.collect(
                 new StreamRecord<>(
                         new PartitioningEvent(

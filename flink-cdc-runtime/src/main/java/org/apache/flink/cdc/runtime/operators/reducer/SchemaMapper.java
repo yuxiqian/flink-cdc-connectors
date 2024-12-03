@@ -116,6 +116,9 @@ public class SchemaMapper extends AbstractStreamOperator<Event>
     public void processElement(StreamRecord<PartitioningEvent> streamRecord) throws Exception {
         // Unpack partitioned events
         PartitioningEvent partitioningEvent = streamRecord.getValue();
+        System.out.printf(
+                "%d> Schema Mapper ::: Received a partitioning event %s\n",
+                subTaskId, partitioningEvent);
         Event event = partitioningEvent.getPayload();
         int sourcePartition = partitioningEvent.getSourcePartition();
 
@@ -149,7 +152,6 @@ public class SchemaMapper extends AbstractStreamOperator<Event>
                                 evolvedSchema)
                         .ifPresent(evt -> output.collect(new StreamRecord<>(evt)));
             }
-
         } else {
             throw new IllegalStateException(
                     subTaskId + "> SchemaMapper received an unexpected event: " + event);

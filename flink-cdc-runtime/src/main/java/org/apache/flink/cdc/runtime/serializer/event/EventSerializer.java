@@ -128,7 +128,6 @@ public final class EventSerializer extends TypeSerializerSingleton<Event> {
     /** Serializer configuration snapshot for compatibility and format evolution. */
     @SuppressWarnings("WeakerAccess")
     public static final class EventSerializerSnapshot extends SimpleTypeSerializerSnapshot<Event> {
-
         public EventSerializerSnapshot() {
             super(() -> INSTANCE);
         }
