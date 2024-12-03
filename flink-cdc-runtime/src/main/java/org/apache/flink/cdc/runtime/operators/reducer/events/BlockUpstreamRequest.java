@@ -59,6 +59,6 @@ public class BlockUpstreamRequest implements OperatorEvent {
 
     @Override
     public String toString() {
-        return "BlockUpstreamRequest{" + ", reduceSeqNum=" + reduceSeqNum + '}';
+        return "BlockUpstreamRequest{reduceSeqNum=" + reduceSeqNum + '}';
     }
 }

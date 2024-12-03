@@ -63,6 +63,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -321,7 +322,7 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
                         .collect(Collectors.toList());
 
         // Sink tables that got affected by current schema reduce
-        List<TableId> affectedSinkTableIds = new ArrayList<>();
+        Set<TableId> affectedSinkTableIds = new HashSet<>();
         Multimap<TableId, SchemaChangeEvent> affectedSinkTableIdsCause = HashMultimap.create();
 
         List<SchemaChangeEvent> evolvedSchemaChanges = new ArrayList<>();
@@ -344,7 +345,7 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
             List<SchemaChangeEvent> localSinkTableSchemaChanges = new ArrayList<>();
 
             // Collect all upstream schemas that merges into this sink table
-            List<Schema> upstreamMergingSchemas =
+            Set<Schema> upstreamMergingSchemas =
                     retrieveUpstreamSchemasFromEvolvedTableId(sinkTableId);
             Preconditions.checkState(!upstreamMergingSchemas.isEmpty(), "Upstream merging schemas should never be empty.");
 
@@ -356,7 +357,14 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
                 Preconditions.checkState(
                         causeSchemaChangeEvents.size() == 1,
                         "One-to-one schema change must have exactly one cause schema change event.");
-                localSinkTableSchemaChanges.add(causeSchemaChangeEvents.get(0).copy(sinkTableId));
+                SchemaChangeEvent forwardedSchemaChangeEvent = causeSchemaChangeEvents.get(0);
+                if (!SchemaInferencingUtils.isSchemaChangeEventRedundant(
+                        oldEvolvedSchema, forwardedSchemaChangeEvent
+                )) {
+                    localSinkTableSchemaChanges.add(forwardedSchemaChangeEvent.copy(sinkTableId));
+                } else {
+                    LOG.info("Received a duplicate schema change event {}, ignoring it", forwardedSchemaChangeEvent);
+                }
             } else {
                 Schema newEvolvedSchema = oldEvolvedSchema;
 
@@ -593,19 +601,19 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
                 && (schemaChangeBehavior == SchemaChangeBehavior.TRY_EVOLVE);
     }
 
-    private List<TableId> retrieveUpstreamTableIdsFromEvolvedTableId(TableId evolvedTableId) {
+    private Set<TableId> retrieveUpstreamTableIdsFromEvolvedTableId(TableId evolvedTableId) {
         return upstreamSchemaTable.rowKeySet().stream()
                 .filter(
                         upstreamTableId ->
                                 tableIdRouter.route(upstreamTableId).contains(evolvedTableId))
-                .collect(Collectors.toList());
+                .collect(Collectors.toSet());
     }
 
-    private List<Schema> retrieveUpstreamSchemasFromEvolvedTableId(TableId evolvedTableId) {
+    private Set<Schema> retrieveUpstreamSchemasFromEvolvedTableId(TableId evolvedTableId) {
         return retrieveUpstreamTableIdsFromEvolvedTableId(evolvedTableId).stream()
                 .flatMap(
                         upstreamTableId ->
                                 upstreamSchemaTable.row(upstreamTableId).values().stream())
-                .collect(Collectors.toList());
+                .collect(Collectors.toSet());
     }
 }
