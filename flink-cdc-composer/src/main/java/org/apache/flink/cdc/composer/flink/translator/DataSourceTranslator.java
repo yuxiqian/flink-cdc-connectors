@@ -35,9 +35,15 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
+import javax.annotation.Nullable;
+
+import java.util.Objects;
+
 /** Translator used to build {@link DataSource} which will generate a {@link DataStream}. */
 @Internal
 public class DataSourceTranslator {
+
+    private @Nullable Boolean guaranteesSchemaChangeIsolation = null;
 
     public DataStreamSource<Event> translate(
             SourceDef sourceDef,
@@ -93,10 +99,17 @@ public class DataSourceTranslator {
                                 sourceDef.getConfig(),
                                 pipelineConfig,
                                 Thread.currentThread().getContextClassLoader()));
+        guaranteesSchemaChangeIsolation = dataSource.guaranteesSchemaChangeIsolation();
         return dataSource;
     }
 
     private String generateDefaultSourceName(SourceDef sourceDef) {
         return String.format("Flink CDC Event Source: %s", sourceDef.getType());
+    }
+
+    public boolean guaranteesSchemaChangeIsolation() {
+        return Objects.requireNonNull(
+                guaranteesSchemaChangeIsolation,
+                "guaranteesSchemaChangeIsolation could not be accessed until data source got created.");
     }
 }

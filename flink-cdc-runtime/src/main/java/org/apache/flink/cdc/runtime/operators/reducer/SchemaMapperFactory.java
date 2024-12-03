@@ -43,17 +43,20 @@ public class SchemaMapperFactory extends SimpleOperatorFactory<Event>
     private final MetadataApplier metadataApplier;
     private final SchemaChangeBehavior schemaChangeBehavior;
     private final List<RouteRule> routingRules;
+    private final boolean guaranteesSchemaChangeIsolation;
 
     public SchemaMapperFactory(
             MetadataApplier metadataApplier,
             SchemaChangeBehavior schemaChangeBehavior,
             List<RouteRule> routingRules,
             Duration rpcTimeOut,
-            String timezone) {
-        super(new SchemaMapper(routingRules, rpcTimeOut, timezone));
+            String timezone,
+            boolean guaranteesSchemaChangeIsolation) {
+        super(new SchemaMapper(routingRules, rpcTimeOut, timezone, schemaChangeBehavior));
         this.metadataApplier = metadataApplier;
         this.schemaChangeBehavior = schemaChangeBehavior;
         this.routingRules = routingRules;
+        this.guaranteesSchemaChangeIsolation = guaranteesSchemaChangeIsolation;
     }
 
     @Override
@@ -71,6 +74,11 @@ public class SchemaMapperFactory extends SimpleOperatorFactory<Event>
     public OperatorCoordinator.Provider getCoordinatorProvider(
             String operatorName, OperatorID operatorID) {
         return new SchemaReducerProvider(
-                operatorID, operatorName, metadataApplier, schemaChangeBehavior, routingRules);
+                operatorID,
+                operatorName,
+                metadataApplier,
+                schemaChangeBehavior,
+                routingRules,
+                guaranteesSchemaChangeIsolation);
     }
 }

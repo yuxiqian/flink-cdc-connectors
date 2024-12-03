@@ -38,18 +38,21 @@ public class SchemaReducerProvider implements OperatorCoordinator.Provider {
     private final MetadataApplier metadataApplier;
     private final SchemaChangeBehavior schemaChangeBehavior;
     private final List<RouteRule> routingRules;
+    private final boolean guaranteesSchemaChangeIsolation;
 
     public SchemaReducerProvider(
             OperatorID operatorID,
             String operatorName,
             MetadataApplier metadataApplier,
             SchemaChangeBehavior schemaChangeBehavior,
-            List<RouteRule> routingRules) {
+            List<RouteRule> routingRules,
+            boolean guaranteesSchemaChangeIsolation) {
         this.operatorID = operatorID;
         this.operatorName = operatorName;
         this.metadataApplier = metadataApplier;
         this.schemaChangeBehavior = schemaChangeBehavior;
         this.routingRules = routingRules;
+        this.guaranteesSchemaChangeIsolation = guaranteesSchemaChangeIsolation;
     }
 
     @Override
@@ -70,7 +73,8 @@ public class SchemaReducerProvider implements OperatorCoordinator.Provider {
                 coordinatorExecutor,
                 metadataApplier,
                 schemaChangeBehavior,
-                routingRules);
+                routingRules,
+                guaranteesSchemaChangeIsolation);
     }
 
     /** A thread factory class that provides some helper methods. */

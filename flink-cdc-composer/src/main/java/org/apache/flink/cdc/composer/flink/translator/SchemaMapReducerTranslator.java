@@ -50,9 +50,16 @@ public class SchemaMapReducerTranslator {
             int parallelism,
             MetadataApplier metadataApplier,
             SchemaChangeBehavior schemaChangeBehavior,
-            List<RouteDef> routes) {
+            List<RouteDef> routes,
+            boolean guaranteesSchemaChangeIsolation) {
         return addSchemaReducer(
-                input, parallelism, metadataApplier, schemaChangeBehavior, routes, timezone);
+                input,
+                parallelism,
+                metadataApplier,
+                schemaChangeBehavior,
+                routes,
+                timezone,
+                guaranteesSchemaChangeIsolation);
     }
 
     private DataStream<Event> addSchemaReducer(
@@ -61,7 +68,8 @@ public class SchemaMapReducerTranslator {
             MetadataApplier metadataApplier,
             SchemaChangeBehavior schemaChangeBehavior,
             List<RouteDef> routes,
-            String timezone) {
+            String timezone,
+            boolean guaranteesSchemaChangeIsolation) {
         List<RouteRule> routingRules = new ArrayList<>();
         for (RouteDef route : routes) {
             routingRules.add(
@@ -78,7 +86,8 @@ public class SchemaMapReducerTranslator {
                                 schemaChangeBehavior,
                                 routingRules,
                                 rpcTimeOut,
-                                timezone))
+                                timezone,
+                                guaranteesSchemaChangeIsolation))
                 .uid(schemaMapReducerUid)
                 .setParallelism(parallelism);
     }

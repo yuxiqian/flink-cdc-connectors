@@ -38,4 +38,9 @@ public class StimpsDataSource implements DataSource {
     public MetadataAccessor getMetadataAccessor() {
         throw new UnsupportedOperationException("Stimps doesn't need a metadata accessor!");
     }
+
+    @Override
+    public boolean guaranteesSchemaChangeIsolation() {
+        return false;
+    }
 }

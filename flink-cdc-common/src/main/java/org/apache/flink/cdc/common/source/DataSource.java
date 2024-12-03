@@ -31,4 +31,13 @@ public interface DataSource {
 
     /** Get the {@link MetadataAccessor} for accessing metadata from external systems. */
     MetadataAccessor getMetadataAccessor();
+
+    /**
+     * Indicating if this source guarantees for each TableId, it will not be evolved differently
+     * among subTasks. Returns {@code true} to get legacy behavior for single-incremented sources
+     * like MySQL.
+     */
+    default boolean guaranteesSchemaChangeIsolation() {
+        return true;
+    }
 }

@@ -224,8 +224,8 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
                         "TruncateTableEvent{tableId=%s.members}",
                         "DataChangeEvent{tableId=%s.members, before=[], after=[1014, Gem, 17.0, null], op=INSERT, meta=()}"),
                 Arrays.asList(
-                        "Ignored schema change DropColumnEvent{tableId=%s.members, droppedColumnNames=[biological_sex]} to table %s.members.",
-                        "Ignored schema change DropTableEvent{tableId=%s.members} to table %s.members."));
+                        "Ignored schema change DropColumnEvent{tableId=%s.members, droppedColumnNames=[biological_sex]}.",
+                        "Ignored schema change DropTableEvent{tableId=%s.members}."));
     }
 
     @Test

@@ -166,7 +166,8 @@ public class FlinkPipelineComposer implements PipelineComposer {
                                 .setAcceptedSchemaEvolutionTypes(
                                         pipelineDef.getSink().getIncludedSchemaEvolutionTypes()),
                         schemaChangeBehavior,
-                        pipelineDef.getRoute());
+                        pipelineDef.getRoute(),
+                        sourceTranslator.guaranteesSchemaChangeIsolation());
 
         // MapReduce -> Sink
         sinkTranslator.translate(

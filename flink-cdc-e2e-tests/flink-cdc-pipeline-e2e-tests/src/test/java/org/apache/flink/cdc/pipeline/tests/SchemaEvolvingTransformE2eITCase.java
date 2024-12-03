@@ -113,10 +113,19 @@ public class SchemaEvolvingTransformE2eITCase extends PipelineTestEnvironment {
                 true,
                 false,
                 false,
-                Collections.emptyList(),
                 Arrays.asList(
-                        "java.lang.IllegalStateException: Incompatible types found for column `age`: \"INT\" and \"DOUBLE\"",
-                        "org.apache.flink.runtime.JobException: Recovery is suppressed by NoRestartBackoffTimeStrategy"));
+                        "CreateTableEvent{tableId=%s.merged, schema=columns={`uid` STRING,`id` INT NOT NULL,`name` VARCHAR(17),`age` INT,`id_square` INT,`tag` STRING}, primaryKeys=id, options=()}",
+                        "DataChangeEvent{tableId=%s.merged, before=[], after=[1008 -> Alice, 1008, Alice, 21, -1016064, age >= 20], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=%s.merged, before=[], after=[1009 -> Bob, 1009, Bob, 20, -1018081, age >= 20], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=%s.merged, before=[], after=[1010 -> Carol, 1010, Carol, 19, 1020100, age < 20], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=%s.merged, before=[], after=[1011 -> Derrida, 1011, Derrida, 18, 1022121, age < 20], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=%s.merged, before=[], after=[0 -> __fence__, 0, __fence__, 0, 0, age < 20], op=INSERT, meta=()}",
+                        "AddColumnEvent{tableId=%s.merged, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=tag}]}",
+                        "DataChangeEvent{tableId=%s.merged, before=[], after=[1012 -> Eve, 1012, Eve, 17, 1024144, age < 20, 0], op=INSERT, meta=()}",
+                        "AlterColumnTypeEvent{tableId=%s.merged, typeMapping={age=STRING}, oldTypeMapping={age=INT}}",
+                        "AddColumnEvent{tableId=%s.merged, addedColumns=[ColumnWithPosition{column=`biological_sex` TINYINT, position=AFTER, existedColumnName=gender}]}",
+                        "DataChangeEvent{tableId=%s.merged, before=[], after=[1013 -> Fiona, 1013, Fiona, 16.0, 1026169, age < 20, null, null], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=%s.merged, before=[], after=[1014 -> Gem, 1014, Gem, 17.0, 1028196, age < 20, null, null], op=INSERT, meta=()}"));
     }
 
     @Test
@@ -128,8 +137,8 @@ public class SchemaEvolvingTransformE2eITCase extends PipelineTestEnvironment {
                 false,
                 Collections.emptyList(),
                 Arrays.asList(
-                        "Failed to apply schema change AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]} to table %s.members. Caused by: UnsupportedSchemaChangeEventException{applyingEvent=AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}, exceptionMessage='Rejected schema change event since error.on.schema.change is enabled.', cause='null'}",
-                        "UnsupportedSchemaChangeEventException{applyingEvent=AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}, exceptionMessage='Rejected schema change event since error.on.schema.change is enabled.', cause='null'}",
+                        "Failed to apply schema change event AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}. Caused by: ",
+                        "org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException",
                         "org.apache.flink.runtime.JobException: Recovery is suppressed by NoRestartBackoffTimeStrategy"));
     }
 
@@ -146,13 +155,12 @@ public class SchemaEvolvingTransformE2eITCase extends PipelineTestEnvironment {
                         "DataChangeEvent{tableId=%s.members, before=[], after=[1013 -> Fiona, 1013, Fiona, null, 1026169, age < 20], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=%s.members, before=[], after=[1014 -> Gem, 1014, Gem, null, 1028196, age < 20], op=INSERT, meta=()}"),
                 Arrays.asList(
-                        "Failed to apply schema change AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]} to table %s.members. Caused by: UnsupportedSchemaChangeEventException{applyingEvent=AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}, exceptionMessage='Rejected schema change event since error.on.schema.change is enabled.', cause='null'}",
+                        "Failed to apply event AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]} to external system, but keeps running in TRY_EVOLVE mode. Caused by: UnsupportedSchemaChangeEventException{applyingEvent=AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}, exceptionMessage='Rejected schema change event since error.on.schema.change is enabled.', cause='null'}",
                         "UnsupportedSchemaChangeEventException{applyingEvent=AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}, exceptionMessage='Rejected schema change event since error.on.schema.change is enabled.', cause='null'}"));
     }
 
     @Test
     public void testSchemaIgnore() throws Exception {
-
         testGenericSchemaEvolution(
                 "ignore",
                 false,
@@ -173,7 +181,7 @@ public class SchemaEvolvingTransformE2eITCase extends PipelineTestEnvironment {
                 false,
                 Collections.emptyList(),
                 Collections.singletonList(
-                        "java.lang.RuntimeException: Refused to apply schema change event AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]} in EXCEPTION mode."));
+                        "An unexpected schema change event AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]} presents in EXCEPTION mode. Job will fail now."));
     }
 
     @Test
@@ -209,8 +217,8 @@ public class SchemaEvolvingTransformE2eITCase extends PipelineTestEnvironment {
                         "TruncateTableEvent{tableId=%s.members}",
                         "DataChangeEvent{tableId=%s.members, before=[], after=[1014 -> Gem, 1014, Gem, 17.0, null, 1028196, age < 20], op=INSERT, meta=()}"),
                 Arrays.asList(
-                        "Ignored schema change DropColumnEvent{tableId=%s.members, droppedColumnNames=[biological_sex]} to table %s.members.",
-                        "Ignored schema change DropTableEvent{tableId=%s.members} to table %s.members."));
+                        "Ignored schema change DropColumnEvent{tableId=%s.members, droppedColumnNames=[biological_sex]}.",
+                        "Ignored schema change DropTableEvent{tableId=%s.members}."));
     }
 
     @Test

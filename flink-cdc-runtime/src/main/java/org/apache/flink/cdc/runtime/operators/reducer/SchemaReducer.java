@@ -90,11 +90,7 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
     private final MetadataApplier metadataApplier;
     private final SchemaChangeBehavior schemaChangeBehavior;
     private final List<RouteRule> routingRules;
-
-    // We only use SchemaManager to store "evolved" schemas that always keeps in sync with sink
-    // database.
-    // It is not possible to hold reliable upstream schema from different source subTasks.
-    private transient SchemaManager schemaManager;
+    private final boolean guaranteesSchemaChangeIsolation;
 
     public SchemaReducer(
             String operatorName,
@@ -102,13 +98,15 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
             ExecutorService coordinatorExecutor,
             MetadataApplier metadataApplier,
             SchemaChangeBehavior schemaChangeBehavior,
-            List<RouteRule> routingRules) {
+            List<RouteRule> routingRules,
+            boolean guaranteesSchemaChangeIsolation) {
         this.context = context;
         this.coordinatorExecutor = coordinatorExecutor;
         this.operatorName = operatorName;
         this.metadataApplier = metadataApplier;
         this.schemaChangeBehavior = schemaChangeBehavior;
         this.routingRules = routingRules;
+        this.guaranteesSchemaChangeIsolation = guaranteesSchemaChangeIsolation;
     }
 
     // -------------------------
@@ -126,6 +124,10 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
             pendingRequests;
     private transient Table<TableId, Integer, Schema> upstreamSchemaTable;
     private transient TableIdRouter tableIdRouter;
+    // We only use SchemaManager to store "evolved" schemas that always keeps in sync with sink
+    // database.
+    // It is not possible to hold reliable upstream schema from different source subTasks.
+    private transient SchemaManager schemaManager;
 
     // This number was kept in-sync to indicate the number of global schema reducing requests that
     // have been processed.
@@ -348,13 +350,32 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
             List<SchemaChangeEvent> localSinkTableSchemaChanges = new ArrayList<>();
 
             // Collect all upstream schemas that merges into this sink table
+            Set<TableId> upstreamMergingTableIds =
+                    retrieveUpstreamTableIdsFromEvolvedTableId(sinkTableId);
             Set<Schema> upstreamMergingSchemas =
                     retrieveUpstreamSchemasFromEvolvedTableId(sinkTableId);
+
+            Preconditions.checkState(
+                    !upstreamMergingTableIds.isEmpty(),
+                    "Upstream merging tableIds should never be empty.");
             Preconditions.checkState(
                     !upstreamMergingSchemas.isEmpty(),
                     "Upstream merging schemas should never be empty.");
 
-            if (upstreamMergingSchemas.size() == 1) {
+            // Indicating if we can forward upstream schema change events directly to sink.
+            // This could be true if:
+            // a) We're using a schema change isolated source, and there's no table merging route
+            // rules.
+            // or b), when we're using a non-isolated source, and it only presents in one single
+            // subTask, it could be safely forwarded, too.
+            boolean isSchemaChangeForwardable;
+            if (guaranteesSchemaChangeIsolation) {
+                isSchemaChangeForwardable = upstreamMergingTableIds.size() == 1;
+            } else {
+                isSchemaChangeForwardable = upstreamMergingSchemas.size() == 1;
+            }
+
+            if (isSchemaChangeForwardable) {
                 // This is a one-to-one relationship, we can simply forward the upstream schema
                 // changes to sink table.
                 List<SchemaChangeEvent> causeSchemaChangeEvents =

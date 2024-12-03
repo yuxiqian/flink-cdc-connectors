@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
@@ -77,11 +78,21 @@ public class SchemaMapper extends AbstractStreamOperator<Event>
     private final Duration rpcTimeOut;
     private final String timezone;
     private final List<RouteRule> routingRules;
+    private final SchemaChangeBehavior schemaChangeBehavior;
+    private final boolean toleranceMode;
 
-    public SchemaMapper(List<RouteRule> routingRules, Duration rpcTimeOut, String timezone) {
+    public SchemaMapper(
+            List<RouteRule> routingRules,
+            Duration rpcTimeOut,
+            String timezone,
+            SchemaChangeBehavior schemaChangeBehavior) {
         this.routingRules = routingRules;
         this.rpcTimeOut = rpcTimeOut;
         this.timezone = timezone;
+        this.schemaChangeBehavior = schemaChangeBehavior;
+        this.toleranceMode =
+                schemaChangeBehavior == SchemaChangeBehavior.TRY_EVOLVE
+                        || schemaChangeBehavior == SchemaChangeBehavior.IGNORE;
     }
 
     // Transient fields that are set when operator is running
@@ -238,7 +249,7 @@ public class SchemaMapper extends AbstractStreamOperator<Event>
                     SchemaUtils.restoreOriginalData(dataChangeEvent.before(), upstreamSchemaReader);
             Object[] coercedRow =
                     SchemaInferencingUtils.coerceRow(
-                            timezone, evolvedSchema, upstreamSchema, upstreamFields);
+                            timezone, evolvedSchema, upstreamSchema, upstreamFields, toleranceMode);
 
             dataChangeEvent =
                     DataChangeEvent.projectBefore(
@@ -250,7 +261,7 @@ public class SchemaMapper extends AbstractStreamOperator<Event>
                     SchemaUtils.restoreOriginalData(dataChangeEvent.after(), upstreamSchemaReader);
             Object[] coercedRow =
                     SchemaInferencingUtils.coerceRow(
-                            timezone, evolvedSchema, upstreamSchema, upstreamFields);
+                            timezone, evolvedSchema, upstreamSchema, upstreamFields, toleranceMode);
 
             dataChangeEvent =
                     DataChangeEvent.projectAfter(

@@ -233,6 +233,20 @@ public class SchemaInferencingUtils {
             Schema currentSchema,
             Schema upcomingSchema,
             List<Object> upcomingRow) {
+        return coerceRow(timezone, currentSchema, upcomingSchema, upcomingRow, false);
+    }
+
+    /**
+     * Coercing {@code upcomingRow} with {@code upcomingTypes} schema into {@code currentTypes}
+     * schema. Invoking this method implicitly assumes that {@code isSchemaCompatible(currentSchema,
+     * upcomingSchema)} returns true. Otherwise, some upstream records might be lost.
+     */
+    public static Object[] coerceRow(
+            String timezone,
+            Schema currentSchema,
+            Schema upcomingSchema,
+            List<Object> upcomingRow,
+            boolean toleranceMode) {
         List<Column> currentColumns = currentSchema.getColumns();
         Map<String, DataType> upcomingColumnTypes =
                 upcomingSchema.getColumns().stream()
@@ -256,12 +270,18 @@ public class SchemaInferencingUtils {
                 if (Objects.equals(upcomingType, currentType)) {
                     coercedRow[i] = upcomingColumnObjects.get(columnName);
                 } else {
-                    coercedRow[i] =
-                            coerceObject(
-                                    timezone,
-                                    upcomingColumnObjects.get(columnName),
-                                    upcomingColumnTypes.get(columnName),
-                                    currentColumn.getType());
+                    try {
+                        coercedRow[i] =
+                                coerceObject(
+                                        timezone,
+                                        upcomingColumnObjects.get(columnName),
+                                        upcomingColumnTypes.get(columnName),
+                                        currentColumn.getType());
+                    } catch (IllegalArgumentException e) {
+                        if (!toleranceMode) {
+                            throw e;
+                        }
+                    }
                 }
             } else {
                 coercedRow[i] = null;
