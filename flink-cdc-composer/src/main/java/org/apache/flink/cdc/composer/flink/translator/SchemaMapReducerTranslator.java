@@ -27,7 +27,6 @@ import org.apache.flink.cdc.runtime.operators.reducer.SchemaMapperFactory;
 import org.apache.flink.cdc.runtime.partitioning.PartitioningEvent;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -71,8 +70,7 @@ public class SchemaMapReducerTranslator {
                             route.getSinkTable(),
                             route.getReplaceSymbol().orElse(null)));
         }
-        SingleOutputStreamOperator<Event> stream =
-                input.transform(
+        return input.transform(
                         "SchemaMapper",
                         new EventTypeInfo(),
                         new SchemaMapperFactory(
@@ -80,8 +78,8 @@ public class SchemaMapReducerTranslator {
                                 schemaChangeBehavior,
                                 routingRules,
                                 rpcTimeOut,
-                                timezone));
-        stream.uid(schemaMapReducerUid).setParallelism(parallelism);
-        return stream;
+                                timezone))
+                .uid(schemaMapReducerUid)
+                .setParallelism(parallelism);
     }
 }

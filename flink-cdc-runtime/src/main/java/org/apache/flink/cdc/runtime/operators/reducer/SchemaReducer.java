@@ -525,6 +525,7 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
                                 SchemaManager.SERIALIZER.serialize(schemaManager);
                         out.writeInt(serializedSchemaManager.length);
                         out.write(serializedSchemaManager);
+                        resultFuture.complete(baos.toByteArray());
                     } catch (Throwable t) {
                         context.failJob(t);
                         throw t;

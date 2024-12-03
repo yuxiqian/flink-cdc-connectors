@@ -75,7 +75,6 @@ public class PrePartitionOperator extends AbstractStreamOperator<PartitioningEve
     @Override
     public void processElement(StreamRecord<Event> element) throws Exception {
         Event event = element.getValue();
-        System.out.printf("%d> Pre Partition ::: Received a raw event %s\n", subTaskId, element);
         if (event instanceof SchemaChangeEvent) {
             SchemaChangeEvent schemaChangeEvent = (SchemaChangeEvent) event;
             TableId tableId = schemaChangeEvent.tableId();

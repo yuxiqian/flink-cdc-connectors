@@ -55,7 +55,7 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
     protected static final String MYSQL_TEST_USER = "mysqluser";
     protected static final String MYSQL_TEST_PASSWORD = "mysqlpw";
     protected static final String INTER_CONTAINER_MYSQL_ALIAS = "mysql";
-    protected static final long EVENT_WAITING_TIMEOUT = 20000L; // TODO: REVERT THIS
+    protected static final long EVENT_WAITING_TIMEOUT = 60000L;
 
     @ClassRule
     public static final MySqlContainer MYSQL =

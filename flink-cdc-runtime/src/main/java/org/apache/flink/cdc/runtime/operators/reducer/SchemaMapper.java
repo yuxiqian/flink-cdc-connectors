@@ -40,6 +40,7 @@ import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;
 import org.apache.flink.runtime.operators.coordination.OperatorEventHandler;
+import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
@@ -116,9 +117,6 @@ public class SchemaMapper extends AbstractStreamOperator<Event>
     public void processElement(StreamRecord<PartitioningEvent> streamRecord) throws Exception {
         // Unpack partitioned events
         PartitioningEvent partitioningEvent = streamRecord.getValue();
-        System.out.printf(
-                "%d> Schema Mapper ::: Received a partitioning event %s\n",
-                subTaskId, partitioningEvent);
         Event event = partitioningEvent.getPayload();
         int sourcePartition = partitioningEvent.getSourcePartition();
 
@@ -209,6 +207,9 @@ public class SchemaMapper extends AbstractStreamOperator<Event>
                 evolvedSchemaMap,
                 schemaMapperSeqNum);
     }
+
+    @Override
+    public void snapshotState(StateSnapshotContext context) throws Exception {}
 
     private Optional<DataChangeEvent> coerceDataRecord(
             DataChangeEvent dataChangeEvent,
