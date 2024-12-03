@@ -223,6 +223,15 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
         LOG.info("Reducer received schema reduce request {}...", request);
         pendingRequests.put(request.getSinkSubTaskId(), Tuple2.of(request, responseFuture));
 
+        if (!request.isAlignRequest()) {
+            SchemaChangeEvent schemaChangeEvent = request.getSchemaChangeEvent();
+            updateUpstreamSchemaTable(
+                    schemaChangeEvent.tableId(),
+                    request.getSourceSubTaskId(),
+                    schemaChangeEvent
+            );
+        }
+
         if (pendingRequests.size() == 1) {
             Preconditions.checkState(
                     reducerStatus.compareAndSet(RequestStatus.IDLE, RequestStatus.BROADCASTING),
@@ -311,10 +320,8 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
                                         !request.isAlignRequest()) // Ignore alignment only requests
                         .collect(Collectors.toList());
 
-        // Sink tables that got affected by current schema reduc
+        // Sink tables that got affected by current schema reduce
         List<TableId> affectedSinkTableIds = new ArrayList<>();
-
-        //
         Multimap<TableId, SchemaChangeEvent> affectedSinkTableIdsCause = HashMultimap.create();
 
         List<SchemaChangeEvent> evolvedSchemaChanges = new ArrayList<>();
@@ -339,6 +346,7 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
             // Collect all upstream schemas that merges into this sink table
             List<Schema> upstreamMergingSchemas =
                     retrieveUpstreamSchemasFromEvolvedTableId(sinkTableId);
+            Preconditions.checkState(!upstreamMergingSchemas.isEmpty(), "Upstream merging schemas should never be empty.");
 
             if (upstreamMergingSchemas.size() == 1) {
                 // This is a one-to-one relationship, we can simply forward the upstream schema
