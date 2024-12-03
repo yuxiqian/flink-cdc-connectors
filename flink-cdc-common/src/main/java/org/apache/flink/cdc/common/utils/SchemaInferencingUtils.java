@@ -728,37 +728,17 @@ public class SchemaInferencingUtils {
         mergingTree.put(BinaryType.class, ImmutableList.of(stringType));
         mergingTree.put(DoubleType.class, ImmutableList.of(doubleType, stringType));
         mergingTree.put(FloatType.class, ImmutableList.of(floatType, doubleType, stringType));
+        mergingTree.put(DecimalType.class, ImmutableList.of(stringType));
+        mergingTree.put(BigIntType.class, ImmutableList.of(bigIntType, decimalType, stringType));
         mergingTree.put(
-                DecimalType.class,
-                ImmutableList.of(decimalType, floatType, doubleType, stringType));
-        mergingTree.put(
-                BigIntType.class,
-                ImmutableList.of(bigIntType, decimalType, floatType, doubleType, stringType));
-        mergingTree.put(
-                IntType.class,
-                ImmutableList.of(
-                        intType, bigIntType, decimalType, floatType, doubleType, stringType));
+                IntType.class, ImmutableList.of(intType, bigIntType, decimalType, stringType));
         mergingTree.put(
                 SmallIntType.class,
-                ImmutableList.of(
-                        smallIntType,
-                        intType,
-                        bigIntType,
-                        decimalType,
-                        floatType,
-                        doubleType,
-                        stringType));
+                ImmutableList.of(smallIntType, intType, bigIntType, decimalType, stringType));
         mergingTree.put(
                 TinyIntType.class,
                 ImmutableList.of(
-                        tinyIntType,
-                        smallIntType,
-                        intType,
-                        bigIntType,
-                        decimalType,
-                        floatType,
-                        doubleType,
-                        stringType));
+                        tinyIntType, smallIntType, intType, bigIntType, decimalType, stringType));
 
         // Timestamp series
         mergingTree.put(ZonedTimestampType.class, ImmutableList.of(timestampTzType, stringType));

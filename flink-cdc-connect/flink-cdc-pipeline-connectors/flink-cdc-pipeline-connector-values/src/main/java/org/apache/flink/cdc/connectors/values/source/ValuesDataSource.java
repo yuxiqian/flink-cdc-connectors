@@ -150,7 +150,8 @@ public class ValuesDataSource implements DataSource {
         @Override
         public SourceReader<Event, EventIteratorSplit> createReader(
                 SourceReaderContext readerContext) {
-            return new EventIteratorReader(readerContext, failAtPos, eventSetId);
+            return new EventIteratorReader(
+                    readerContext, failAtPos, eventSetId, readerContext.currentParallelism());
         }
 
         private static void serializeEventIteratorSplit(
@@ -259,13 +260,17 @@ public class ValuesDataSource implements DataSource {
 
         private int numberOfEventsEmit = 0;
 
+        private final int parallelism;
+
         public EventIteratorReader(
                 SourceReaderContext context,
                 int failAtPos,
-                ValuesDataSourceHelper.EventSetId eventSetId) {
+                ValuesDataSourceHelper.EventSetId eventSetId,
+                int parallelism) {
             super(context);
             this.failAtPos = failAtPos;
             this.eventSetId = eventSetId;
+            this.parallelism = parallelism;
         }
 
         @Override
@@ -292,6 +297,15 @@ public class ValuesDataSource implements DataSource {
             }
             numberOfEventsEmit++;
             return super.pollNext(output);
+        }
+
+        @Override
+        public void close() throws Exception {
+            if (parallelism > 1) {
+                // To allow test running correctly, we need to wait for downstream schema evolutions
+                // to finish before closing any subTask.
+                Thread.sleep(10000);
+            }
         }
 
         @Override

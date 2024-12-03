@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventWithPreSchema;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Column;
@@ -36,10 +37,28 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-/** Rewrites schema change events based on current schema change behavior. */
-public class SchemaLenientizer {
+/**
+ * Rewrites schema change events based on current schema change behavior and backfills pre-schema
+ * info.
+ */
+public class SchemaNormalizer {
 
-    public static List<SchemaChangeEvent> lenientizeSchemaChangeEvents(
+    public static List<SchemaChangeEvent> normalizeSchemaChangeEvents(
+            Schema oldSchema,
+            List<SchemaChangeEvent> schemaChangeEvents,
+            SchemaChangeBehavior schemaChangeBehavior) {
+        List<SchemaChangeEvent> rewrittenSchemaChangeEvents =
+                rewriteSchemaChangeEvents(oldSchema, schemaChangeEvents, schemaChangeBehavior);
+        rewrittenSchemaChangeEvents.forEach(
+                evt -> {
+                    if (evt instanceof SchemaChangeEventWithPreSchema) {
+                        ((SchemaChangeEventWithPreSchema) evt).fillPreSchema(oldSchema);
+                    }
+                });
+        return rewrittenSchemaChangeEvents;
+    }
+
+    private static List<SchemaChangeEvent> rewriteSchemaChangeEvents(
             Schema oldSchema,
             List<SchemaChangeEvent> schemaChangeEvents,
             SchemaChangeBehavior schemaChangeBehavior) {

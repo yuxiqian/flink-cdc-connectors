@@ -35,7 +35,7 @@ import org.apache.flink.cdc.runtime.operators.reducer.events.GetEvolvedSchemaRes
 import org.apache.flink.cdc.runtime.operators.reducer.events.ReduceSchemaRequest;
 import org.apache.flink.cdc.runtime.operators.reducer.events.ReduceSchemaResponse;
 import org.apache.flink.cdc.runtime.operators.reducer.events.SinkWriterRegisterEvent;
-import org.apache.flink.cdc.runtime.operators.reducer.utils.SchemaLenientizer;
+import org.apache.flink.cdc.runtime.operators.reducer.utils.SchemaNormalizer;
 import org.apache.flink.cdc.runtime.operators.reducer.utils.TableIdRouter;
 import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaManager;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
@@ -48,7 +48,7 @@ import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.function.ThrowingRunnable;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.HashBasedTable;
-import org.apache.flink.shaded.guava31.com.google.common.collect.HashMultimap;
+import org.apache.flink.shaded.guava31.com.google.common.collect.LinkedHashMultimap;
 import org.apache.flink.shaded.guava31.com.google.common.collect.Multimap;
 import org.apache.flink.shaded.guava31.com.google.common.collect.Table;
 
@@ -62,7 +62,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -221,16 +220,13 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
 
     private void handleReduceSchemaRequest(
             ReduceSchemaRequest request, CompletableFuture<CoordinationResponse> responseFuture) {
-        LOG.info("Reducer received schema reduce request {}...", request);
+        LOG.info("Reducer received schema reduce request {}.", request);
         pendingRequests.put(request.getSinkSubTaskId(), Tuple2.of(request, responseFuture));
 
         if (!request.isAlignRequest()) {
             SchemaChangeEvent schemaChangeEvent = request.getSchemaChangeEvent();
             updateUpstreamSchemaTable(
-                    schemaChangeEvent.tableId(),
-                    request.getSourceSubTaskId(),
-                    schemaChangeEvent
-            );
+                    schemaChangeEvent.tableId(), request.getSourceSubTaskId(), schemaChangeEvent);
         }
 
         if (pendingRequests.size() == 1) {
@@ -323,7 +319,8 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
 
         // Sink tables that got affected by current schema reduce
         Set<TableId> affectedSinkTableIds = new HashSet<>();
-        Multimap<TableId, SchemaChangeEvent> affectedSinkTableIdsCause = HashMultimap.create();
+        Multimap<TableId, SchemaChangeEvent> affectedSinkTableIdsCause =
+                LinkedHashMultimap.create();
 
         List<SchemaChangeEvent> evolvedSchemaChanges = new ArrayList<>();
 
@@ -331,39 +328,45 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
             SchemaChangeEvent schemaChangeEvent = schemaReduceRequest.getSchemaChangeEvent();
             TableId tableId = schemaChangeEvent.tableId();
 
-            tableIdRouter.route(tableId).forEach(sinkTableId -> {
-                affectedSinkTableIds.add(sinkTableId);
-                affectedSinkTableIdsCause.put(sinkTableId, schemaChangeEvent);
-            });
+            tableIdRouter
+                    .route(tableId)
+                    .forEach(
+                            sinkTableId -> {
+                                affectedSinkTableIds.add(sinkTableId);
+                                affectedSinkTableIdsCause.put(sinkTableId, schemaChangeEvent);
+                            });
         }
 
         for (TableId sinkTableId : affectedSinkTableIds) {
             Schema oldEvolvedSchema =
                     schemaManager.getLatestEvolvedSchema(sinkTableId).orElse(null);
 
-            // Local schema changes, before being lenientized and applied
+            // Local schema changes, before being lenientized and applied to sink
             List<SchemaChangeEvent> localSinkTableSchemaChanges = new ArrayList<>();
 
             // Collect all upstream schemas that merges into this sink table
             Set<Schema> upstreamMergingSchemas =
                     retrieveUpstreamSchemasFromEvolvedTableId(sinkTableId);
-            Preconditions.checkState(!upstreamMergingSchemas.isEmpty(), "Upstream merging schemas should never be empty.");
+            Preconditions.checkState(
+                    !upstreamMergingSchemas.isEmpty(),
+                    "Upstream merging schemas should never be empty.");
 
             if (upstreamMergingSchemas.size() == 1) {
                 // This is a one-to-one relationship, we can simply forward the upstream schema
                 // changes to sink table.
                 List<SchemaChangeEvent> causeSchemaChangeEvents =
                         new ArrayList<>(affectedSinkTableIdsCause.get(sinkTableId));
-                Preconditions.checkState(
-                        causeSchemaChangeEvents.size() == 1,
-                        "One-to-one schema change must have exactly one cause schema change event.");
-                SchemaChangeEvent forwardedSchemaChangeEvent = causeSchemaChangeEvents.get(0);
-                if (!SchemaInferencingUtils.isSchemaChangeEventRedundant(
-                        oldEvolvedSchema, forwardedSchemaChangeEvent
-                )) {
-                    localSinkTableSchemaChanges.add(forwardedSchemaChangeEvent.copy(sinkTableId));
-                } else {
-                    LOG.info("Received a duplicate schema change event {}, ignoring it", forwardedSchemaChangeEvent);
+
+                for (SchemaChangeEvent forwardedSchemaChangeEvent : causeSchemaChangeEvents) {
+                    if (!SchemaInferencingUtils.isSchemaChangeEventRedundant(
+                            oldEvolvedSchema, forwardedSchemaChangeEvent)) {
+                        localSinkTableSchemaChanges.add(
+                                forwardedSchemaChangeEvent.copy(sinkTableId));
+                    } else {
+                        LOG.info(
+                                "Received a duplicate forwarded schema change event {}, ignoring it.",
+                                forwardedSchemaChangeEvent);
+                    }
                 }
             } else {
                 Schema newEvolvedSchema = oldEvolvedSchema;
@@ -382,7 +385,7 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
 
             // Then, we rewrite schema change events based on current schema change behavior
             evolvedSchemaChanges.addAll(
-                    SchemaLenientizer.lenientizeSchemaChangeEvents(
+                    SchemaNormalizer.normalizeSchemaChangeEvents(
                             oldEvolvedSchema, localSinkTableSchemaChanges, schemaChangeBehavior));
         }
         return evolvedSchemaChanges;
