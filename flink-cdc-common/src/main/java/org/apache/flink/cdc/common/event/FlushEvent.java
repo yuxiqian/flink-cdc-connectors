@@ -21,17 +21,4 @@ package org.apache.flink.cdc.common.event;
  * An {@link Event} from {@code SchemaOperator} to notify {@code DataSinkWriterOperator} that it
  * start flushing.
  */
-public class FlushEvent implements Event {
-
-    public FlushEvent() {}
-
-    public FlushEvent(TableId tableId) {
-        throw new UnsupportedOperationException(
-                "This should be removed since now a FlushEvent must flush any uncommitted data, no matter what tables they belongs to.");
-    }
-
-    public TableId getTableId() {
-        throw new UnsupportedOperationException(
-                "This should be removed since now a FlushEvent must flush any uncommitted data, no matter what tables they belongs to.");
-    }
-}
+public class FlushEvent implements Event {}

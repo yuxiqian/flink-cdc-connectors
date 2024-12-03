@@ -89,7 +89,7 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
     private final ExecutorService coordinatorExecutor;
     private final MetadataApplier metadataApplier;
     private final SchemaChangeBehavior schemaChangeBehavior;
-    private final TableIdRouter tableIdRouter;
+    private final List<RouteRule> routingRules;
 
     // We only use SchemaManager to store "evolved" schemas that always keeps in sync with sink
     // database.
@@ -108,7 +108,7 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
         this.operatorName = operatorName;
         this.metadataApplier = metadataApplier;
         this.schemaChangeBehavior = schemaChangeBehavior;
-        this.tableIdRouter = new TableIdRouter(routingRules);
+        this.routingRules = routingRules;
     }
 
     // -------------------------
@@ -125,6 +125,7 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
                     Integer, Tuple2<ReduceSchemaRequest, CompletableFuture<CoordinationResponse>>>
             pendingRequests;
     private transient Table<TableId, Integer, Schema> upstreamSchemaTable;
+    private transient TableIdRouter tableIdRouter;
 
     // This number was kept in-sync to indicate the number of global schema reducing requests that
     // have been processed.
@@ -147,6 +148,7 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
         this.reducerStatus = new AtomicReference<>(RequestStatus.IDLE);
         this.pendingRequests = new ConcurrentHashMap<>();
         this.upstreamSchemaTable = HashBasedTable.create();
+        this.tableIdRouter = new TableIdRouter(routingRules);
         this.schemaMapperSeqNum = new AtomicInteger(0);
         LOG.info(
                 "Started SchemaRegistry for {}. Parallelism: {}", operatorName, currentParallelism);
@@ -218,20 +220,6 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
 
     private void handleReduceSchemaRequest(
             ReduceSchemaRequest request, CompletableFuture<CoordinationResponse> responseFuture) {
-        int sourcePartition = request.getSourceSubTaskId();
-        SchemaChangeEvent schemaChangeEvent = request.getSchemaChangeEvent();
-        TableId tableId = schemaChangeEvent.tableId();
-
-        if (!updateUpstreamSchemaTable(tableId, sourcePartition, schemaChangeEvent)) {
-            // If nothing changes, there's no need to trigger another global schema reduce. Just
-            // release it.
-            responseFuture.complete(
-                    wrap(
-                            new ReduceSchemaResponse(
-                                    Collections.emptyList(), schemaMapperSeqNum.get())));
-            return;
-        }
-
         LOG.info("Reducer received schema reduce request {}...", request);
         pendingRequests.put(request.getSinkSubTaskId(), Tuple2.of(request, responseFuture));
 
@@ -315,17 +303,6 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
     }
 
     private List<SchemaChangeEvent> deduceEvolvedSchemaChanges() {
-        // key (TableId): evolved table ids that got affected during this schema reducing.
-        // values (Schemas): upstream schemas that routes to this evolved table
-        Multimap<TableId, Schema> groupedSchemas = HashMultimap.create();
-
-        // key (TableId): evolved table ids that got affected during this schema reducing.
-        // values (Schemas): upstream schema change events originates during this change.
-        // Recording this because if it is an 1-to-1 relationship, we can simply apply original
-        // schema change events to the terminus without any inferencing.
-        Multimap<TableId, SchemaChangeEvent> groupedPendingSchemaChangeEvents =
-                HashMultimap.create();
-
         List<ReduceSchemaRequest> validSchemaReduceRequests =
                 pendingRequests.values().stream()
                         .map(e -> e.f0)
@@ -334,47 +311,55 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
                                         !request.isAlignRequest()) // Ignore alignment only requests
                         .collect(Collectors.toList());
 
-        for (ReduceSchemaRequest schemaReduceRequest : validSchemaReduceRequests) {
-            int sourcePartition = schemaReduceRequest.getSourceSubTaskId();
-            SchemaChangeEvent schemaChangeEvent = schemaReduceRequest.getSchemaChangeEvent();
-            TableId tableId = schemaChangeEvent.tableId();
-            Schema upstreamSchema = upstreamSchemaTable.get(tableId, sourcePartition);
-            tableIdRouter
-                    .route(tableId)
-                    .forEach(
-                            sinkTableId -> {
-                                groupedSchemas.put(sinkTableId, upstreamSchema);
-                                groupedPendingSchemaChangeEvents.put(
-                                        sinkTableId, schemaChangeEvent);
-                            });
-        }
+        // Sink tables that got affected by current schema reduc
+        List<TableId> affectedSinkTableIds = new ArrayList<>();
+
+        //
+        Multimap<TableId, SchemaChangeEvent> affectedSinkTableIdsCause = HashMultimap.create();
 
         List<SchemaChangeEvent> evolvedSchemaChanges = new ArrayList<>();
 
-        for (TableId sinkTableId : groupedSchemas.keySet()) {
+        for (ReduceSchemaRequest schemaReduceRequest : validSchemaReduceRequests) {
+            SchemaChangeEvent schemaChangeEvent = schemaReduceRequest.getSchemaChangeEvent();
+            TableId tableId = schemaChangeEvent.tableId();
+
+            tableIdRouter.route(tableId).forEach(sinkTableId -> {
+                affectedSinkTableIds.add(sinkTableId);
+                affectedSinkTableIdsCause.put(sinkTableId, schemaChangeEvent);
+            });
+        }
+
+        for (TableId sinkTableId : affectedSinkTableIds) {
             Schema oldEvolvedSchema =
                     schemaManager.getLatestEvolvedSchema(sinkTableId).orElse(null);
-            List<SchemaChangeEvent> sinkTableSchemaChanges = new ArrayList<>();
-            if (groupedSchemas.get(sinkTableId).size() == 1) {
-                // This is a one-to-one relationship, we can simply forward the upstream schema
-                // changes to sink table
-                SchemaChangeEvent routedSchemaChangeEvent =
-                        groupedPendingSchemaChangeEvents.get(sinkTableId).stream()
-                                .findFirst()
-                                .get();
 
-                sinkTableSchemaChanges.add(routedSchemaChangeEvent.copy(sinkTableId));
+            // Local schema changes, before being lenientized and applied
+            List<SchemaChangeEvent> localSinkTableSchemaChanges = new ArrayList<>();
+
+            // Collect all upstream schemas that merges into this sink table
+            List<Schema> upstreamMergingSchemas =
+                    retrieveUpstreamSchemasFromEvolvedTableId(sinkTableId);
+
+            if (upstreamMergingSchemas.size() == 1) {
+                // This is a one-to-one relationship, we can simply forward the upstream schema
+                // changes to sink table.
+                List<SchemaChangeEvent> causeSchemaChangeEvents =
+                        new ArrayList<>(affectedSinkTableIdsCause.get(sinkTableId));
+                Preconditions.checkState(
+                        causeSchemaChangeEvents.size() == 1,
+                        "One-to-one schema change must have exactly one cause schema change event.");
+                localSinkTableSchemaChanges.add(causeSchemaChangeEvents.get(0).copy(sinkTableId));
             } else {
                 Schema newEvolvedSchema = oldEvolvedSchema;
 
                 // Otherwise, we try to merge entire upstream schemas
-                for (Schema upstreamSchema : groupedSchemas.get(sinkTableId)) {
+                for (Schema upstreamSchema : upstreamMergingSchemas) {
                     newEvolvedSchema =
                             SchemaInferencingUtils.getLeastCommonSchema(
                                     newEvolvedSchema, upstreamSchema);
                 }
 
-                sinkTableSchemaChanges.addAll(
+                localSinkTableSchemaChanges.addAll(
                         SchemaInferencingUtils.getSchemaDifference(
                                 sinkTableId, oldEvolvedSchema, newEvolvedSchema));
             }
@@ -382,7 +367,7 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
             // Then, we rewrite schema change events based on current schema change behavior
             evolvedSchemaChanges.addAll(
                     SchemaLenientizer.lenientizeSchemaChangeEvents(
-                            oldEvolvedSchema, sinkTableSchemaChanges, schemaChangeBehavior));
+                            oldEvolvedSchema, localSinkTableSchemaChanges, schemaChangeBehavior));
         }
         return evolvedSchemaChanges;
     }
@@ -428,10 +413,7 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
     // -------------------------
 
     private void handleFlushSuccessEvent(FlushSuccessEvent event) {
-        LOG.info(
-                "Sink subtask {} succeed flushing for table {}.",
-                event.getSubtask(),
-                event.getTableId().toString());
+        LOG.info("Sink subtask {} succeed flushing.", event.getSubtask());
         flushedSinkWriters.add(event.getSubtask());
     }
 
@@ -601,5 +583,21 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
         // In EXCEPTION mode, an exception will be thrown once captured
         return (throwable instanceof UnsupportedSchemaChangeEventException)
                 && (schemaChangeBehavior == SchemaChangeBehavior.TRY_EVOLVE);
+    }
+
+    private List<TableId> retrieveUpstreamTableIdsFromEvolvedTableId(TableId evolvedTableId) {
+        return upstreamSchemaTable.rowKeySet().stream()
+                .filter(
+                        upstreamTableId ->
+                                tableIdRouter.route(upstreamTableId).contains(evolvedTableId))
+                .collect(Collectors.toList());
+    }
+
+    private List<Schema> retrieveUpstreamSchemasFromEvolvedTableId(TableId evolvedTableId) {
+        return retrieveUpstreamTableIdsFromEvolvedTableId(evolvedTableId).stream()
+                .flatMap(
+                        upstreamTableId ->
+                                upstreamSchemaTable.row(upstreamTableId).values().stream())
+                .collect(Collectors.toList());
     }
 }

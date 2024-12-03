@@ -180,13 +180,10 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
                         if (event instanceof FlushSuccessEvent) {
                             FlushSuccessEvent flushSuccessEvent = (FlushSuccessEvent) event;
                             LOG.info(
-                                    "Sink subtask {} succeed flushing for table {}.",
-                                    flushSuccessEvent.getSubtask(),
-                                    flushSuccessEvent.getTableId().toString());
+                                    "Sink subtask {} succeed flushing.",
+                                    flushSuccessEvent.getSubtask());
                             requestHandler.flushSuccess(
-                                    flushSuccessEvent.getTableId(),
-                                    flushSuccessEvent.getSubtask(),
-                                    currentParallelism);
+                                    flushSuccessEvent.getSubtask(), currentParallelism);
                         } else if (event instanceof SinkWriterRegisterEvent) {
                             requestHandler.registerSinkWriter(
                                     ((SinkWriterRegisterEvent) event).getSubtask());

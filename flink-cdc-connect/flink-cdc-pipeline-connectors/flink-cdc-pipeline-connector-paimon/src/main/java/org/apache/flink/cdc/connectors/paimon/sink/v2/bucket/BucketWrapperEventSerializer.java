@@ -81,7 +81,6 @@ public class BucketWrapperEventSerializer extends TypeSerializerSingleton<Event>
             enumSerializer.serialize(EventClass.BUCKET_WRAPPER_FLUSH_EVENT, dataOutputView);
             BucketWrapperFlushEvent bucketWrapperFlushEvent = (BucketWrapperFlushEvent) event;
             dataOutputView.writeInt(bucketWrapperFlushEvent.getBucket());
-            tableIdSerializer.serialize(bucketWrapperFlushEvent.getTableId(), dataOutputView);
         }
     }
 
@@ -89,8 +88,7 @@ public class BucketWrapperEventSerializer extends TypeSerializerSingleton<Event>
     public Event deserialize(DataInputView source) throws IOException {
         EventClass eventClass = enumSerializer.deserialize(source);
         if (eventClass.equals(EventClass.BUCKET_WRAPPER_FLUSH_EVENT)) {
-            return new BucketWrapperFlushEvent(
-                    source.readInt(), tableIdSerializer.deserialize(source));
+            return new BucketWrapperFlushEvent(source.readInt());
         } else {
             return new BucketWrapperChangeEvent(
                     source.readInt(), (ChangeEvent) eventSerializer.deserialize(source));

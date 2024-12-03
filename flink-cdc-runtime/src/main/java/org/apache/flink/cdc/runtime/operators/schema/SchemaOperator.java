@@ -446,7 +446,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         SchemaChangeResponse response = requestSchemaChange(tableId, schemaChangeEvent);
         if (response.isAccepted()) {
             LOG.info("{}> Sending the FlushEvent for table {}.", subTaskId, tableId);
-            output.collect(new StreamRecord<>(new FlushEvent(tableId)));
+            output.collect(new StreamRecord<>(new FlushEvent()));
             List<SchemaChangeEvent> expectedSchemaChangeEvents = response.getSchemaChangeEvents();
             schemaOperatorMetrics.increaseSchemaChangeEvents(expectedSchemaChangeEvents.size());
 

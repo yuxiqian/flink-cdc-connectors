@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.runtime.operators.reducer.events;
 
-import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;
 
@@ -33,20 +32,12 @@ public class FlushSuccessEvent implements OperatorEvent {
     /** The sink subtask finished flushing. */
     private final int subtask;
 
-    /** The schema changes from which table is executing it. */
-    private final TableId tableId;
-
-    public FlushSuccessEvent(int subtask, TableId tableId) {
+    public FlushSuccessEvent(int subtask) {
         this.subtask = subtask;
-        this.tableId = tableId;
     }
 
     public int getSubtask() {
         return subtask;
-    }
-
-    public TableId getTableId() {
-        return tableId;
     }
 
     @Override
@@ -58,11 +49,11 @@ public class FlushSuccessEvent implements OperatorEvent {
             return false;
         }
         FlushSuccessEvent that = (FlushSuccessEvent) o;
-        return subtask == that.subtask && Objects.equals(tableId, that.tableId);
+        return subtask == that.subtask;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(subtask, tableId);
+        return Objects.hash(subtask);
     }
 }

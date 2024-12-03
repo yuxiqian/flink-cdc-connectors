@@ -121,10 +121,7 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
     public void processElement(StreamRecord<Event> streamRecord) throws Exception {
         Event event = streamRecord.getValue();
         if (event instanceof FlushEvent) {
-            output.collect(
-                    new StreamRecord<>(
-                            new BucketWrapperFlushEvent(
-                                    currentTaskNumber, ((FlushEvent) event).getTableId())));
+            output.collect(new StreamRecord<>(new BucketWrapperFlushEvent(currentTaskNumber)));
             return;
         }
 

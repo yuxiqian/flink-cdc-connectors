@@ -20,7 +20,6 @@ package org.apache.flink.cdc.runtime.serializer.event;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
-import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.runtime.partitioning.PartitioningEvent;
 import org.apache.flink.cdc.runtime.serializer.SerializerTestBase;
 
@@ -49,12 +48,7 @@ class PartitioningEventSerializerTest extends SerializerTestBase<PartitioningEve
 
     @Override
     protected PartitioningEvent[] getTestData() {
-        Event[] flushEvents =
-                new Event[] {
-                    new FlushEvent(TableId.tableId("table")),
-                    new FlushEvent(TableId.tableId("schema", "table")),
-                    new FlushEvent(TableId.tableId("namespace", "schema", "table"))
-                };
+        Event[] flushEvents = new Event[] {new FlushEvent(), new FlushEvent(), new FlushEvent()};
         Event[] dataChangeEvents = new DataChangeEventSerializerTest().getTestData();
         Event[] schemaChangeEvents = new SchemaChangeEventSerializerTest().getTestData();
 

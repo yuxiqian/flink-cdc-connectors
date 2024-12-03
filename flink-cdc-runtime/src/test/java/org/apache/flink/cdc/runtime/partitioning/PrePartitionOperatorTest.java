@@ -79,7 +79,7 @@ class PrePartitionOperatorTest {
 
             // FlushEvent
             PrePartitionOperator operator = testHarness.getOperator();
-            FlushEvent flushEvent = new FlushEvent(CUSTOMERS);
+            FlushEvent flushEvent = new FlushEvent();
             operator.processElement(new StreamRecord<>(flushEvent));
             assertThat(testHarness.getOutputRecords()).hasSize(DOWNSTREAM_PARALLELISM);
             for (int i = 0; i < DOWNSTREAM_PARALLELISM; i++) {

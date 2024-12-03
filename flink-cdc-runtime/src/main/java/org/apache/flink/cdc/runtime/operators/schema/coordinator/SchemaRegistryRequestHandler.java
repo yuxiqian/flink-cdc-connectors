@@ -233,11 +233,9 @@ public class SchemaRegistryRequestHandler implements Closeable {
     /**
      * Apply the schema change to the external system.
      *
-     * @param tableId the table need to change schema
      * @param derivedSchemaChangeEvents list of the schema changes
      */
-    private void applySchemaChange(
-            TableId tableId, List<SchemaChangeEvent> derivedSchemaChangeEvents) {
+    private void applySchemaChange(List<SchemaChangeEvent> derivedSchemaChangeEvents) {
         for (SchemaChangeEvent changeEvent : derivedSchemaChangeEvents) {
             if (changeEvent.getType() != SchemaChangeEventType.CREATE_TABLE) {
                 if (schemaChangeBehavior == SchemaChangeBehavior.IGNORE) {
@@ -246,20 +244,16 @@ public class SchemaRegistryRequestHandler implements Closeable {
                 }
             }
             if (!metadataApplier.acceptsSchemaEvolutionType(changeEvent.getType())) {
-                LOG.info("Ignored schema change {} to table {}.", changeEvent, tableId);
+                LOG.info("Ignored schema change {}.", changeEvent);
                 currentIgnoredSchemaChanges.add(changeEvent);
             } else {
                 try {
                     metadataApplier.applySchemaChange(changeEvent);
-                    LOG.info("Applied schema change {} to table {}.", changeEvent, tableId);
+                    LOG.info("Applied schema change {}.", changeEvent);
                     schemaManager.applyEvolvedSchemaChange(changeEvent);
                     currentFinishedSchemaChanges.add(changeEvent);
                 } catch (Throwable t) {
-                    LOG.error(
-                            "Failed to apply schema change {} to table {}. Caused by: {}",
-                            changeEvent,
-                            tableId,
-                            t);
+                    LOG.error("Failed to apply schema change {}. Caused by: {}", changeEvent, t);
                     if (!shouldIgnoreException(t)) {
                         currentChangeException = t;
                         break;
@@ -295,10 +289,9 @@ public class SchemaRegistryRequestHandler implements Closeable {
     /**
      * Record flushed sink subtasks after receiving FlushSuccessEvent.
      *
-     * @param tableId the subtask in SchemaOperator and table that the FlushEvent is about
      * @param sinkSubtask the sink subtask succeed flushing
      */
-    public void flushSuccess(TableId tableId, int sinkSubtask, int parallelism) {
+    public void flushSuccess(int sinkSubtask, int parallelism) {
         flushedSinkWriters.add(sinkSubtask);
         if (activeSinkWriters.size() < parallelism) {
             LOG.info(
@@ -314,11 +307,9 @@ public class SchemaRegistryRequestHandler implements Closeable {
                             + schemaChangeStatus);
 
             schemaChangeStatus = RequestStatus.APPLYING;
-            LOG.info(
-                    "All sink subtask have flushed for table {}. Start to apply schema change.",
-                    tableId.toString());
+            LOG.info("All sink subtask have flushed. Start to apply schema change.");
             schemaChangeThreadPool.submit(
-                    () -> applySchemaChange(tableId, currentDerivedSchemaChangeEvents));
+                    () -> applySchemaChange(currentDerivedSchemaChangeEvents));
         }
     }
 

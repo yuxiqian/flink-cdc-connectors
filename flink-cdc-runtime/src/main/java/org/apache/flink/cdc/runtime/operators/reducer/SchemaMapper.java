@@ -73,12 +73,12 @@ public class SchemaMapper extends AbstractStreamOperator<Event>
     private static final Logger LOG = LoggerFactory.getLogger(SchemaMapper.class);
 
     // Final fields that are set upon construction
-    private final TableIdRouter tableIdRouter;
     private final Duration rpcTimeOut;
     private final String timezone;
+    private final List<RouteRule> routingRules;
 
     public SchemaMapper(List<RouteRule> routingRules, Duration rpcTimeOut, String timezone) {
-        this.tableIdRouter = new TableIdRouter(routingRules);
+        this.routingRules = routingRules;
         this.rpcTimeOut = rpcTimeOut;
         this.timezone = timezone;
     }
@@ -90,7 +90,7 @@ public class SchemaMapper extends AbstractStreamOperator<Event>
     // Records TableId and its integer.
     private transient volatile Table<TableId, Integer, Schema> upstreamSchemaTable;
     private transient volatile Map<TableId, Schema> evolvedSchemaMap;
-
+    private transient TableIdRouter tableIdRouter;
     private transient volatile int schemaMapperSeqNum;
 
     @Override
@@ -99,6 +99,7 @@ public class SchemaMapper extends AbstractStreamOperator<Event>
         subTaskId = getRuntimeContext().getTaskInfo().getIndexOfThisSubtask();
         upstreamSchemaTable = HashBasedTable.create();
         evolvedSchemaMap = new HashMap<>();
+        tableIdRouter = new TableIdRouter(routingRules);
         schemaMapperSeqNum = 0;
     }
 
@@ -185,6 +186,8 @@ public class SchemaMapper extends AbstractStreamOperator<Event>
         ReduceSchemaResponse response = sendRequestToCoordinator(reduceSchemaRequest);
 
         LOG.info("{}> Reduce request response: {}", subTaskId, response);
+
+        // Update local evolved schema cache
         response.getReducedSchemaResult()
                 .forEach(
                         schemaChangeEvent ->
@@ -193,6 +196,10 @@ public class SchemaMapper extends AbstractStreamOperator<Event>
                                         (tableId, schema) ->
                                                 SchemaUtils.applySchemaChangeEvent(
                                                         schema, schemaChangeEvent)));
+
+        // And emit schema change events to downstream
+        response.getReducedSchemaResult().forEach(evt -> output.collect(new StreamRecord<>(evt)));
+
         schemaMapperSeqNum = response.getReduceSeqNum();
         LOG.info(
                 "{}> Successfully updated evolved schema cache. Current state: {} at version {}",
