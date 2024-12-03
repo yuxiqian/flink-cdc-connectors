@@ -44,6 +44,11 @@ public final class AddColumnEvent implements SchemaChangeEvent {
         this.addedColumns = addedColumns;
     }
 
+    @Override
+    public SchemaChangeEvent copy(TableId newTableId) {
+        return new AddColumnEvent(newTableId, addedColumns);
+    }
+
     public static AddColumnEvent.ColumnWithPosition first(Column addColumn) {
         return new ColumnWithPosition(addColumn, ColumnPosition.FIRST, null);
     }

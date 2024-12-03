@@ -59,6 +59,11 @@ public class AlterColumnTypeEvent implements SchemaChangeEventWithPreSchema, Sch
         this.oldTypeMapping = oldTypeMapping;
     }
 
+    @Override
+    public SchemaChangeEvent copy(TableId newTableId) {
+        return new AlterColumnTypeEvent(newTableId, typeMapping, oldTypeMapping);
+    }
+
     /** Returns the type mapping. */
     public Map<String, DataType> getTypeMapping() {
         return typeMapping;

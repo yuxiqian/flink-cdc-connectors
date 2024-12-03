@@ -40,6 +40,11 @@ public class DropColumnEvent implements SchemaChangeEvent {
         this.droppedColumnNames = droppedColumnNames;
     }
 
+    @Override
+    public SchemaChangeEvent copy(TableId newTableId) {
+        return new DropColumnEvent(newTableId, droppedColumnNames);
+    }
+
     public List<String> getDroppedColumnNames() {
         return droppedColumnNames;
     }

@@ -38,6 +38,11 @@ public class TruncateTableEvent implements SchemaChangeEvent {
     }
 
     @Override
+    public SchemaChangeEvent copy(TableId newTableId) {
+        return new TruncateTableEvent(newTableId);
+    }
+
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;

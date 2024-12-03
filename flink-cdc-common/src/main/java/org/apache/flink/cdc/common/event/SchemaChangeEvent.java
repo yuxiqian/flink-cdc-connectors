@@ -29,4 +29,9 @@ import java.io.Serializable;
 public interface SchemaChangeEvent extends ChangeEvent, Serializable {
     /** Returns its {@link SchemaChangeEventType}. */
     SchemaChangeEventType getType();
+
+    default SchemaChangeEvent copy(TableId newTableId) {
+        throw new UnsupportedOperationException(
+                "This schema change event does not support copying.");
+    }
 }

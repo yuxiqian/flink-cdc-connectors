@@ -31,6 +31,7 @@ import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.event.visitor.SchemaChangeEventVisitor;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.ArrayType;
@@ -167,9 +168,7 @@ public class SchemaInferencingUtils {
 
     /**
      * Generating what schema change events we need to do by converting compatible {@code
-     * beforeSchema} to {@code afterSchema}. Notice that it is guaranteed that afterSchema is
-     * compatible with beforeSchema, and only CreateTableEvent or AlterColumnTypeEvent +
-     * AddColumnEvent will be emitted
+     * beforeSchema} to {@code afterSchema}.
      */
     public static List<SchemaChangeEvent> getSchemaDifference(
             TableId tableId, @Nullable Schema beforeSchema, Schema afterSchema) {
@@ -269,6 +268,91 @@ public class SchemaInferencingUtils {
             }
         }
         return coercedRow;
+    }
+
+    public static boolean isSchemaChangeEventRedundant(
+            @Nullable Schema currentSchema, SchemaChangeEvent schemaChangeEvent) {
+        return Boolean.TRUE.equals(
+                SchemaChangeEventVisitor.visit(
+                        schemaChangeEvent,
+                        addColumnEvent -> {
+                            // It is not applicable if schema does not even exist
+                            if (currentSchema == null) {
+                                return true;
+                            }
+                            List<Column> existedColumns = currentSchema.getColumns();
+
+                            // It has been applied only if all columns are present in existedColumns
+                            for (AddColumnEvent.ColumnWithPosition column :
+                                    addColumnEvent.getAddedColumns()) {
+                                if (!existedColumns.contains(column.getAddColumn())) {
+                                    return false;
+                                }
+                            }
+                            return true;
+                        },
+                        alterColumnTypeEvent -> {
+                            // It is not applicable if schema does not even exist
+                            if (currentSchema == null) {
+                                return true;
+                            }
+
+                            // It has been applied only if all column types are set as expected
+                            for (Map.Entry<String, DataType> entry :
+                                    alterColumnTypeEvent.getTypeMapping().entrySet()) {
+                                if (!currentSchema.getColumn(entry.getKey()).isPresent()
+                                        || !currentSchema
+                                                .getColumn(entry.getKey())
+                                                .get()
+                                                .getType()
+                                                .equals(entry.getValue())) {
+                                    return false;
+                                }
+                            }
+                            return true;
+                        },
+                        createTableEvent -> {
+                            // It has been applied if such table already exists
+                            return currentSchema != null;
+                        },
+                        dropColumnEvent -> {
+                            // It is not applicable if schema does not even exist
+                            if (currentSchema == null) {
+                                return true;
+                            }
+                            List<String> existedColumnNames = currentSchema.getColumnNames();
+
+                            // It has been applied only if corresponding column types do not exist
+                            return dropColumnEvent.getDroppedColumnNames().stream()
+                                    .noneMatch(existedColumnNames::contains);
+                        },
+                        dropTableEvent -> {
+                            // It is not applicable if schema does not even exist
+                            return currentSchema == null;
+                        },
+                        renameColumnEvent -> {
+                            // It is not applicable if schema does not even exist
+                            if (currentSchema == null) {
+                                return true;
+                            }
+                            List<String> existedColumnNames = currentSchema.getColumnNames();
+
+                            // It has been applied only if all previous names do not exist, and all
+                            // new names already exist
+                            for (Map.Entry<String, String> entry :
+                                    renameColumnEvent.getNameMapping().entrySet()) {
+                                if (existedColumnNames.contains(entry.getKey())
+                                        || !existedColumnNames.contains(entry.getValue())) {
+                                    return false;
+                                }
+                            }
+                            return true;
+                        },
+                        truncateTableEvent -> {
+                            // We have no way to ensure if a TruncateTableEvent has been applied
+                            // before. Just assume it's not.
+                            return false;
+                        }));
     }
 
     @VisibleForTesting

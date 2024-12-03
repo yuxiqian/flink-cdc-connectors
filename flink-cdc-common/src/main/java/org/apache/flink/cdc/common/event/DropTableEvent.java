@@ -38,6 +38,11 @@ public class DropTableEvent implements SchemaChangeEvent {
     }
 
     @Override
+    public SchemaChangeEvent copy(TableId newTableId) {
+        return new DropTableEvent(newTableId);
+    }
+
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;

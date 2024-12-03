@@ -41,6 +41,11 @@ public class CreateTableEvent implements SchemaChangeEvent {
         this.schema = schema;
     }
 
+    @Override
+    public SchemaChangeEvent copy(TableId newTableId) {
+        return new CreateTableEvent(newTableId, schema);
+    }
+
     /** Returns the table schema. */
     public Schema getSchema() {
         return schema;
