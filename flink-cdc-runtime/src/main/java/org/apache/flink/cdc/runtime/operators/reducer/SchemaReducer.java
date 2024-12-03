@@ -389,7 +389,10 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
             // Then, we rewrite schema change events based on current schema change behavior
             evolvedSchemaChanges.addAll(
                     SchemaNormalizer.normalizeSchemaChangeEvents(
-                            oldEvolvedSchema, localSinkTableSchemaChanges, schemaChangeBehavior));
+                            oldEvolvedSchema,
+                            localSinkTableSchemaChanges,
+                            schemaChangeBehavior,
+                            metadataApplier));
         }
         return evolvedSchemaChanges;
     }
@@ -407,7 +410,11 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
                         t);
                 return false;
             } else {
-                throw new FlinkRuntimeException(t);
+                throw new FlinkRuntimeException(
+                        "Failed to apply schema change event "
+                                + schemaChangeEvent
+                                + ". Caused by: ",
+                        t);
             }
         }
     }

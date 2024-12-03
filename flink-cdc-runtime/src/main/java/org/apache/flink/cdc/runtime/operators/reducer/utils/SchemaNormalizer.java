@@ -28,7 +28,11 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.types.DataType;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -43,10 +47,13 @@ import java.util.stream.Stream;
  */
 public class SchemaNormalizer {
 
+    private static final Logger LOG = LoggerFactory.getLogger(SchemaNormalizer.class);
+
     public static List<SchemaChangeEvent> normalizeSchemaChangeEvents(
             Schema oldSchema,
             List<SchemaChangeEvent> schemaChangeEvents,
-            SchemaChangeBehavior schemaChangeBehavior) {
+            SchemaChangeBehavior schemaChangeBehavior,
+            MetadataApplier metadataApplier) {
         List<SchemaChangeEvent> rewrittenSchemaChangeEvents =
                 rewriteSchemaChangeEvents(oldSchema, schemaChangeEvents, schemaChangeBehavior);
         rewrittenSchemaChangeEvents.forEach(
@@ -55,7 +62,16 @@ public class SchemaNormalizer {
                         ((SchemaChangeEventWithPreSchema) evt).fillPreSchema(oldSchema);
                     }
                 });
-        return rewrittenSchemaChangeEvents;
+
+        List<SchemaChangeEvent> finalSchemaChangeEvents = new ArrayList<>();
+        for (SchemaChangeEvent schemaChangeEvent : rewrittenSchemaChangeEvents) {
+            if (metadataApplier.acceptsSchemaEvolutionType(schemaChangeEvent.getType())) {
+                finalSchemaChangeEvents.add(schemaChangeEvent);
+            } else {
+                LOG.info("Ignored schema change {}.", schemaChangeEvent);
+            }
+        }
+        return finalSchemaChangeEvents;
     }
 
     private static List<SchemaChangeEvent> rewriteSchemaChangeEvents(

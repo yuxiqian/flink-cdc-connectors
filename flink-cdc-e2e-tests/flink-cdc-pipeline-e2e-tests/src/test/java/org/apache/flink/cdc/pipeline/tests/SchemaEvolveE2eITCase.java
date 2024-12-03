@@ -113,10 +113,19 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
                 true,
                 false,
                 false,
-                Collections.emptyList(),
                 Arrays.asList(
-                        "java.lang.IllegalStateException: Incompatible types found for column `age`: \"INT\" and \"DOUBLE\"",
-                        "org.apache.flink.runtime.JobException: Recovery is suppressed by NoRestartBackoffTimeStrategy"));
+                        "CreateTableEvent{tableId=%s.merged, schema=columns={`id` INT NOT NULL,`name` VARCHAR(17),`age` INT}, primaryKeys=id, options=()}",
+                        "DataChangeEvent{tableId=%s.merged, before=[], after=[1008, Alice, 21], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=%s.merged, before=[], after=[1009, Bob, 20], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=%s.merged, before=[], after=[1010, Carol, 19], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=%s.merged, before=[], after=[1011, Derrida, 18], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=%s.merged, before=[], after=[0, __fence__, 0], op=INSERT, meta=()}",
+                        "AddColumnEvent{tableId=%s.merged, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}",
+                        "DataChangeEvent{tableId=%s.merged, before=[], after=[1012, Eve, 17, 0], op=INSERT, meta=()}",
+                        "AlterColumnTypeEvent{tableId=%s.merged, typeMapping={age=STRING}, oldTypeMapping={age=INT}}",
+                        "AddColumnEvent{tableId=%s.merged, addedColumns=[ColumnWithPosition{column=`precise_age` DOUBLE, position=AFTER, existedColumnName=gender}]}",
+                        "AddColumnEvent{tableId=%s.merged, addedColumns=[ColumnWithPosition{column=`biological_sex` TINYINT, position=AFTER, existedColumnName=precise_age}]}",
+                        "DataChangeEvent{tableId=%s.merged, before=[], after=[1013, Fiona, null, null, 16.0, null], op=INSERT, meta=()}"));
     }
 
     @Test
@@ -128,8 +137,8 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
                 false,
                 Collections.emptyList(),
                 Arrays.asList(
-                        "Failed to apply schema change AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]} to table %s.members. Caused by: UnsupportedSchemaChangeEventException{applyingEvent=AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}, exceptionMessage='Rejected schema change event since error.on.schema.change is enabled.', cause='null'}",
-                        "UnsupportedSchemaChangeEventException{applyingEvent=AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}, exceptionMessage='Rejected schema change event since error.on.schema.change is enabled.', cause='null'}",
+                        "Failed to apply schema change event AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}. Caused by: ",
+                        "Caused by: org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException",
                         "org.apache.flink.runtime.JobException: Recovery is suppressed by NoRestartBackoffTimeStrategy"));
     }
 
@@ -144,9 +153,8 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
                         // Add column never succeeded, so age column will not appear.
                         "DataChangeEvent{tableId=%s.members, before=[], after=[1012, Eve, 17], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=%s.members, before=[], after=[1013, Fiona, null], op=INSERT, meta=()}"),
-                Arrays.asList(
-                        "Failed to apply schema change AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]} to table %s.members. Caused by: UnsupportedSchemaChangeEventException{applyingEvent=AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}, exceptionMessage='Rejected schema change event since error.on.schema.change is enabled.', cause='null'}",
-                        "UnsupportedSchemaChangeEventException{applyingEvent=AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}, exceptionMessage='Rejected schema change event since error.on.schema.change is enabled.', cause='null'}"));
+                Collections.singletonList(
+                        "Failed to apply event AlterColumnTypeEvent{tableId=%s.members, typeMapping={age=DOUBLE}, oldTypeMapping={age=INT}} to external system, but keeps running in TRY_EVOLVE mode. Caused by: UnsupportedSchemaChangeEventException{applyingEvent=AlterColumnTypeEvent{tableId=%s.members, typeMapping={age=DOUBLE}, oldTypeMapping={age=INT}}, exceptionMessage='Rejected schema change event since error.on.schema.change is enabled.', cause='null'}"));
     }
 
     @Test
@@ -171,8 +179,9 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
                 false,
                 false,
                 Collections.emptyList(),
-                Collections.singletonList(
-                        "java.lang.RuntimeException: Refused to apply schema change event AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]} in EXCEPTION mode."));
+                Arrays.asList(
+                        "org.apache.flink.runtime.JobException: Recovery is suppressed by NoRestartBackoffTimeStrategy",
+                        "An unexpected schema change event AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]} presents in EXCEPTION mode. Job will fail now."));
     }
 
     @Test
@@ -200,7 +209,6 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
 
     @Test
     public void testFineGrainedSchemaEvolution() throws Exception {
-
         testGenericSchemaEvolution(
                 "evolve",
                 false,

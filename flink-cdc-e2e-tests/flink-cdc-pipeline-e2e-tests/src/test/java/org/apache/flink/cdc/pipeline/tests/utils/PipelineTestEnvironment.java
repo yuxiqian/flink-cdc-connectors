@@ -68,7 +68,15 @@ public abstract class PipelineTestEnvironment extends TestLogger {
 
     @Parameterized.Parameter public String flinkVersion;
 
-    public Integer parallelism = 1;
+    public int parallelism = getSpecifiedParallelism();
+
+    private int getSpecifiedParallelism() {
+        try {
+            return Integer.parseInt(System.getProperty("specifiedParallelism"));
+        } catch (NumberFormatException e) {
+            return 1;
+        }
+    }
 
     // ------------------------------------------------------------------------------------------
     // Flink Variables
