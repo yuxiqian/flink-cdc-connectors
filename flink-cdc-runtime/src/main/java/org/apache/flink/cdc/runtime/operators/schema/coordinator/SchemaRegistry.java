@@ -23,15 +23,15 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
+import org.apache.flink.cdc.runtime.operators.reducer.events.FlushSuccessEvent;
+import org.apache.flink.cdc.runtime.operators.reducer.events.GetEvolvedSchemaRequest;
+import org.apache.flink.cdc.runtime.operators.reducer.events.GetEvolvedSchemaResponse;
+import org.apache.flink.cdc.runtime.operators.reducer.events.GetOriginalSchemaRequest;
+import org.apache.flink.cdc.runtime.operators.reducer.events.GetOriginalSchemaResponse;
+import org.apache.flink.cdc.runtime.operators.reducer.events.SinkWriterRegisterEvent;
 import org.apache.flink.cdc.runtime.operators.schema.SchemaOperator;
-import org.apache.flink.cdc.runtime.operators.schema.event.FlushSuccessEvent;
-import org.apache.flink.cdc.runtime.operators.schema.event.GetEvolvedSchemaRequest;
-import org.apache.flink.cdc.runtime.operators.schema.event.GetEvolvedSchemaResponse;
-import org.apache.flink.cdc.runtime.operators.schema.event.GetOriginalSchemaRequest;
-import org.apache.flink.cdc.runtime.operators.schema.event.GetOriginalSchemaResponse;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeResultRequest;
-import org.apache.flink.cdc.runtime.operators.schema.event.SinkWriterRegisterEvent;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequestHandler;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
@@ -59,7 +59,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 
-import static org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils.wrap;
+import static org.apache.flink.cdc.runtime.operators.reducer.events.CoordinationResponseUtils.wrap;
 
 /**
  * The implementation of the {@link OperatorCoordinator} for the {@link SchemaOperator}.

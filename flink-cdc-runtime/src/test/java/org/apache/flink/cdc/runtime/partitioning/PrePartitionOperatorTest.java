@@ -63,7 +63,8 @@ class PrePartitionOperatorTest {
             assertThat(testHarness.getOutputRecords()).hasSize(DOWNSTREAM_PARALLELISM);
             for (int i = 0; i < DOWNSTREAM_PARALLELISM; i++) {
                 assertThat(testHarness.getOutputRecords().poll())
-                        .isEqualTo(new StreamRecord<>(new PartitioningEvent(createTableEvent, i)));
+                        .isEqualTo(
+                                new StreamRecord<>(new PartitioningEvent(createTableEvent, 0, i)));
             }
         }
     }
@@ -83,7 +84,7 @@ class PrePartitionOperatorTest {
             assertThat(testHarness.getOutputRecords()).hasSize(DOWNSTREAM_PARALLELISM);
             for (int i = 0; i < DOWNSTREAM_PARALLELISM; i++) {
                 assertThat(testHarness.getOutputRecords().poll())
-                        .isEqualTo(new StreamRecord<>(new PartitioningEvent(flushEvent, i)));
+                        .isEqualTo(new StreamRecord<>(new PartitioningEvent(flushEvent, 0, i)));
             }
         }
     }
@@ -117,12 +118,14 @@ class PrePartitionOperatorTest {
                             new StreamRecord<>(
                                     new PartitioningEvent(
                                             eventA,
+                                            0,
                                             getPartitioningTarget(CUSTOMERS_SCHEMA, eventA))));
             assertThat(testHarness.getOutputRecords().poll())
                     .isEqualTo(
                             new StreamRecord<>(
                                     new PartitioningEvent(
                                             eventB,
+                                            0,
                                             getPartitioningTarget(CUSTOMERS_SCHEMA, eventB))));
         }
     }

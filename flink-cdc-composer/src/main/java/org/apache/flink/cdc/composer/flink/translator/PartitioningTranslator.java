@@ -22,10 +22,10 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.function.HashFunctionProvider;
 import org.apache.flink.cdc.runtime.partitioning.EventPartitioner;
+import org.apache.flink.cdc.runtime.partitioning.PartitioningEvent;
 import org.apache.flink.cdc.runtime.partitioning.PartitioningEventKeySelector;
 import org.apache.flink.cdc.runtime.partitioning.PostPartitionProcessor;
 import org.apache.flink.cdc.runtime.partitioning.PrePartitionOperator;
-import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.cdc.runtime.typeutils.PartitioningEventTypeInfo;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -37,20 +37,18 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 @Internal
 public class PartitioningTranslator {
 
-    public DataStream<Event> translate(
+    public DataStream<PartitioningEvent> translate(
             DataStream<Event> input,
             int upstreamParallelism,
             int downstreamParallelism,
             OperatorID schemaOperatorID,
             HashFunctionProvider<DataChangeEvent> hashFunctionProvider) {
         return input.transform(
-                        "PrePartition",
+                        "Partitioning",
                         new PartitioningEventTypeInfo(),
                         new PrePartitionOperator(
                                 schemaOperatorID, downstreamParallelism, hashFunctionProvider))
                 .setParallelism(upstreamParallelism)
-                .partitionCustom(new EventPartitioner(), new PartitioningEventKeySelector())
-                .map(new PostPartitionProcessor(), new EventTypeInfo())
-                .name("PostPartition");
+                .partitionCustom(new EventPartitioner(), new PartitioningEventKeySelector());
     }
 }

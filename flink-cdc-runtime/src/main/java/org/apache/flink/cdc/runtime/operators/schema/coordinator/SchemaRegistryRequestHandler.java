@@ -59,7 +59,7 @@ import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils.wrap;
+import static org.apache.flink.cdc.runtime.operators.reducer.events.CoordinationResponseUtils.wrap;
 
 /** A handler to deal with all requests and events for {@link SchemaRegistry}. */
 @Internal

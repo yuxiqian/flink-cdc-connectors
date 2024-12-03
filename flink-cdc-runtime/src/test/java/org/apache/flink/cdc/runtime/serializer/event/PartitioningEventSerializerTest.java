@@ -62,15 +62,15 @@ class PartitioningEventSerializerTest extends SerializerTestBase<PartitioningEve
 
         partitioningEvents.addAll(
                 Arrays.stream(flushEvents)
-                        .map(event -> new PartitioningEvent(event, 1))
+                        .map(event -> new PartitioningEvent(event, 0, 1))
                         .collect(Collectors.toList()));
         partitioningEvents.addAll(
                 Arrays.stream(dataChangeEvents)
-                        .map(event -> new PartitioningEvent(event, 2))
+                        .map(event -> new PartitioningEvent(event, 1, 2))
                         .collect(Collectors.toList()));
         partitioningEvents.addAll(
                 Arrays.stream(schemaChangeEvents)
-                        .map(event -> new PartitioningEvent(event, 3))
+                        .map(event -> new PartitioningEvent(event, 2, 3))
                         .collect(Collectors.toList()));
 
         return partitioningEvents.toArray(new PartitioningEvent[0]);

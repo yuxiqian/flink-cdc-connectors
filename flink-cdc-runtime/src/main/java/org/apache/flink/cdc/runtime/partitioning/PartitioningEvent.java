@@ -29,15 +29,21 @@ import java.util.Objects;
 @Internal
 public class PartitioningEvent implements Event {
     private final Event payload;
+    private final int sourcePartition;
     private final int targetPartition;
 
-    public PartitioningEvent(Event payload, int targetPartition) {
+    public PartitioningEvent(Event payload, int sourcePartition, int targetPartition) {
         this.payload = payload;
+        this.sourcePartition = sourcePartition;
         this.targetPartition = targetPartition;
     }
 
     public Event getPayload() {
         return payload;
+    }
+
+    public int getSourcePartition() {
+        return sourcePartition;
     }
 
     public int getTargetPartition() {
@@ -53,12 +59,14 @@ public class PartitioningEvent implements Event {
             return false;
         }
         PartitioningEvent that = (PartitioningEvent) o;
-        return targetPartition == that.targetPartition && Objects.equals(payload, that.payload);
+        return sourcePartition == that.sourcePartition
+                && targetPartition == that.targetPartition
+                && Objects.equals(payload, that.payload);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(payload, targetPartition);
+        return Objects.hash(payload, sourcePartition, targetPartition);
     }
 
     @Override
@@ -66,6 +74,8 @@ public class PartitioningEvent implements Event {
         return "PartitioningEvent{"
                 + "payload="
                 + payload
+                + ", sourcePartition="
+                + sourcePartition
                 + ", targetPartition="
                 + targetPartition
                 + '}';

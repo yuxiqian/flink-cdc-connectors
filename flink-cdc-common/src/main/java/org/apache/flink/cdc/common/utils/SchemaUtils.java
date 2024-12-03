@@ -40,7 +40,6 @@ import org.apache.flink.cdc.common.types.ZonedTimestampType;
 import javax.annotation.Nullable;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -77,7 +76,7 @@ public class SchemaUtils {
     public static List<Object> restoreOriginalData(
             @Nullable RecordData recordData, List<RecordData.FieldGetter> fieldGetters) {
         if (recordData == null) {
-            return Collections.emptyList();
+            return null;
         }
         List<Object> actualFields = new ArrayList<>();
         for (RecordData.FieldGetter fieldGetter : fieldGetters) {

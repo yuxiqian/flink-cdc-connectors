@@ -17,39 +17,21 @@
 
 package org.apache.flink.cdc.common.event;
 
-import java.util.Objects;
-
 /**
  * An {@link Event} from {@code SchemaOperator} to notify {@code DataSinkWriterOperator} that it
  * start flushing.
  */
 public class FlushEvent implements Event {
 
-    /** The schema changes from which table. */
-    private final TableId tableId;
+    public FlushEvent() {}
 
     public FlushEvent(TableId tableId) {
-        this.tableId = tableId;
+        throw new UnsupportedOperationException(
+                "This should be removed since now a FlushEvent must flush any uncommitted data, no matter what tables they belongs to.");
     }
 
     public TableId getTableId() {
-        return tableId;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (!(o instanceof FlushEvent)) {
-            return false;
-        }
-        FlushEvent that = (FlushEvent) o;
-        return Objects.equals(tableId, that.tableId);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(tableId);
+        throw new UnsupportedOperationException(
+                "This should be removed since now a FlushEvent must flush any uncommitted data, no matter what tables they belongs to.");
     }
 }

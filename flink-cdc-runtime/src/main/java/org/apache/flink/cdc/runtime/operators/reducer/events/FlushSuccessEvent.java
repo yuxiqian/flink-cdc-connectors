@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.runtime.operators.schema.event;
+package org.apache.flink.cdc.runtime.operators.reducer.events;
 
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;

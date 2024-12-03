@@ -43,13 +43,15 @@ public class PartitioningEventSerializer extends TypeSerializerSingleton<Partiti
 
     @Override
     public PartitioningEvent createInstance() {
-        return new PartitioningEvent(null, -1);
+        return new PartitioningEvent(null, -1, -1);
     }
 
     @Override
     public PartitioningEvent copy(PartitioningEvent from) {
         return new PartitioningEvent(
-                eventSerializer.copy(from.getPayload()), from.getTargetPartition());
+                eventSerializer.copy(from.getPayload()),
+                from.getSourcePartition(),
+                from.getTargetPartition());
     }
 
     @Override
@@ -65,14 +67,16 @@ public class PartitioningEventSerializer extends TypeSerializerSingleton<Partiti
     @Override
     public void serialize(PartitioningEvent record, DataOutputView target) throws IOException {
         eventSerializer.serialize(record.getPayload(), target);
+        target.writeInt(record.getSourcePartition());
         target.writeInt(record.getTargetPartition());
     }
 
     @Override
     public PartitioningEvent deserialize(DataInputView source) throws IOException {
         Event payload = eventSerializer.deserialize(source);
+        int sourcePartition = source.readInt();
         int targetPartition = source.readInt();
-        return new PartitioningEvent(payload, targetPartition);
+        return new PartitioningEvent(payload, sourcePartition, targetPartition);
     }
 
     @Override

@@ -30,8 +30,10 @@ import org.apache.flink.cdc.composer.flink.coordination.OperatorIDGenerator;
 import org.apache.flink.cdc.composer.flink.translator.DataSinkTranslator;
 import org.apache.flink.cdc.composer.flink.translator.DataSourceTranslator;
 import org.apache.flink.cdc.composer.flink.translator.PartitioningTranslator;
+import org.apache.flink.cdc.composer.flink.translator.SchemaMapReducerTranslator;
 import org.apache.flink.cdc.composer.flink.translator.SchemaOperatorTranslator;
 import org.apache.flink.cdc.composer.flink.translator.TransformTranslator;
+import org.apache.flink.cdc.runtime.partitioning.PartitioningEvent;
 import org.apache.flink.cdc.runtime.serializer.event.EventSerializer;
 import org.apache.flink.configuration.DeploymentOptions;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -97,14 +99,48 @@ public class FlinkPipelineComposer implements PipelineComposer {
         SchemaChangeBehavior schemaChangeBehavior =
                 pipelineDefConfig.get(PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR);
 
-        // Build Source Operator
+        // Source Translator
         DataSourceTranslator sourceTranslator = new DataSourceTranslator();
+
+        // Pre- and Post- Transform Translators
+        TransformTranslator transformTranslator = new TransformTranslator();
+
+        // Schema Operator Translator
+        SchemaOperatorTranslator schemaOperatorTranslator =
+                new SchemaOperatorTranslator(
+                        schemaChangeBehavior,
+                        pipelineDefConfig.get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID),
+                        pipelineDefConfig.get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_RPC_TIMEOUT),
+                        pipelineDefConfig.get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE));
+
+        // Schema Map-Reducer Translator
+        SchemaMapReducerTranslator schemaMapReducerTranslator =
+                new SchemaMapReducerTranslator(
+                        pipelineDefConfig.get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID),
+                        pipelineDefConfig.get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_RPC_TIMEOUT),
+                        pipelineDefConfig.get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE));
+
+        // Partitioning Translator
+        PartitioningTranslator partitioningTranslator = new PartitioningTranslator();
+
+        // Sink Translator
+        DataSinkTranslator sinkTranslator = new DataSinkTranslator();
+
+        DataSink dataSink =
+                sinkTranslator.createDataSink(pipelineDef.getSink(), pipelineDefConfig, env);
+
+        OperatorIDGenerator schemaOperatorIDGenerator =
+                new OperatorIDGenerator(
+                        pipelineDefConfig.get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID));
+
+        // Start translating job graph
+
+        // -> Source
         DataStream<Event> stream =
                 sourceTranslator.translate(
                         pipelineDef.getSource(), env, pipelineDefConfig, parallelism);
 
-        // Build PreTransformOperator for processing Schema Event
-        TransformTranslator transformTranslator = new TransformTranslator();
+        // Source -> PreTransform
         stream =
                 transformTranslator.translatePreTransform(
                         stream,
@@ -112,42 +148,17 @@ public class FlinkPipelineComposer implements PipelineComposer {
                         pipelineDef.getUdfs(),
                         pipelineDef.getModels());
 
-        // Schema operator
-        SchemaOperatorTranslator schemaOperatorTranslator =
-                new SchemaOperatorTranslator(
-                        schemaChangeBehavior,
-                        pipelineDefConfig.get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID),
-                        pipelineDefConfig.get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_RPC_TIMEOUT),
-                        pipelineDefConfig.get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE));
-        OperatorIDGenerator schemaOperatorIDGenerator =
-                new OperatorIDGenerator(schemaOperatorTranslator.getSchemaOperatorUid());
-
-        // Build PostTransformOperator for processing Data Event
+        // PreTransform -> PostTransform
         stream =
                 transformTranslator.translatePostTransform(
                         stream,
                         pipelineDef.getTransforms(),
-                        pipelineDef.getConfig().get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE),
+                        pipelineDefConfig.get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE),
                         pipelineDef.getUdfs(),
                         pipelineDef.getModels());
 
-        // Build DataSink in advance as schema operator requires MetadataApplier
-        DataSinkTranslator sinkTranslator = new DataSinkTranslator();
-        DataSink dataSink =
-                sinkTranslator.createDataSink(pipelineDef.getSink(), pipelineDefConfig, env);
-
-        stream =
-                schemaOperatorTranslator.translate(
-                        stream,
-                        parallelism,
-                        dataSink.getMetadataApplier()
-                                .setAcceptedSchemaEvolutionTypes(
-                                        pipelineDef.getSink().getIncludedSchemaEvolutionTypes()),
-                        pipelineDef.getRoute());
-
-        // Build Partitioner used to shuffle Event
-        PartitioningTranslator partitioningTranslator = new PartitioningTranslator();
-        stream =
+        // PostTransform -> Partitioning
+        DataStream<PartitioningEvent> partitionedStream =
                 partitioningTranslator.translate(
                         stream,
                         parallelism,
@@ -155,7 +166,18 @@ public class FlinkPipelineComposer implements PipelineComposer {
                         schemaOperatorIDGenerator.generate(),
                         dataSink.getDataChangeEventHashFunctionProvider(parallelism));
 
-        // Build Sink Operator
+        // Partitioning -> Route -> MapReduce
+        stream =
+                schemaMapReducerTranslator.translate(
+                        partitionedStream,
+                        parallelism,
+                        dataSink.getMetadataApplier()
+                                .setAcceptedSchemaEvolutionTypes(
+                                        pipelineDef.getSink().getIncludedSchemaEvolutionTypes()),
+                        schemaChangeBehavior,
+                        pipelineDef.getRoute());
+
+        // MapReduce -> Sink
         sinkTranslator.translate(
                 pipelineDef.getSink(), stream, dataSink, schemaOperatorIDGenerator.generate());
 

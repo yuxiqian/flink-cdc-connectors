@@ -24,14 +24,14 @@ import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.runtime.operators.reducer.events.FlushSuccessEvent;
+import org.apache.flink.cdc.runtime.operators.reducer.events.GetEvolvedSchemaRequest;
+import org.apache.flink.cdc.runtime.operators.reducer.events.GetEvolvedSchemaResponse;
+import org.apache.flink.cdc.runtime.operators.reducer.events.GetOriginalSchemaRequest;
+import org.apache.flink.cdc.runtime.operators.reducer.events.GetOriginalSchemaResponse;
+import org.apache.flink.cdc.runtime.operators.reducer.events.SinkWriterRegisterEvent;
 import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
-import org.apache.flink.cdc.runtime.operators.schema.event.FlushSuccessEvent;
-import org.apache.flink.cdc.runtime.operators.schema.event.GetEvolvedSchemaRequest;
-import org.apache.flink.cdc.runtime.operators.schema.event.GetEvolvedSchemaResponse;
-import org.apache.flink.cdc.runtime.operators.schema.event.GetOriginalSchemaRequest;
-import org.apache.flink.cdc.runtime.operators.schema.event.GetOriginalSchemaResponse;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeRequest;
-import org.apache.flink.cdc.runtime.operators.schema.event.SinkWriterRegisterEvent;
 import org.apache.flink.cdc.runtime.operators.sink.SchemaEvolutionClient;
 import org.apache.flink.cdc.runtime.testutils.schema.CollectingMetadataApplier;
 import org.apache.flink.cdc.runtime.testutils.schema.TestingSchemaRegistryGateway;
@@ -58,7 +58,7 @@ import java.util.LinkedList;
 import java.util.Set;
 import java.util.concurrent.Executors;
 
-import static org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils.unwrap;
+import static org.apache.flink.cdc.runtime.operators.reducer.events.CoordinationResponseUtils.unwrap;
 
 /**
  * Harness for testing customized operators handling {@link Event}s in CDC pipeline.

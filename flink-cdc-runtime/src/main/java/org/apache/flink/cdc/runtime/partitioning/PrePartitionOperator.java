@@ -20,7 +20,6 @@ package org.apache.flink.cdc.runtime.partitioning;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
-import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.function.HashFunction;
@@ -59,6 +58,7 @@ public class PrePartitionOperator extends AbstractStreamOperator<PartitioningEve
 
     private transient SchemaEvolutionClient schemaEvolutionClient;
     private transient LoadingCache<TableId, HashFunction<DataChangeEvent>> cachedHashFunctions;
+    private transient int subTaskId;
 
     public PrePartitionOperator(
             OperatorID schemaOperatorId,
@@ -77,6 +77,7 @@ public class PrePartitionOperator extends AbstractStreamOperator<PartitioningEve
                 getContainingTask().getEnvironment().getOperatorCoordinatorEventGateway();
         schemaEvolutionClient = new SchemaEvolutionClient(toCoordinator, schemaOperatorId);
         cachedHashFunctions = createCache();
+        subTaskId = getRuntimeContext().getTaskInfo().getIndexOfThisSubtask();
     }
 
     @Override
@@ -88,12 +89,12 @@ public class PrePartitionOperator extends AbstractStreamOperator<PartitioningEve
             cachedHashFunctions.put(tableId, recreateHashFunction(tableId));
             // Broadcast SchemaChangeEvent
             broadcastEvent(event);
-        } else if (event instanceof FlushEvent) {
-            // Broadcast FlushEvent
-            broadcastEvent(event);
         } else if (event instanceof DataChangeEvent) {
             // Partition DataChangeEvent by table ID and primary keys
             partitionBy(((DataChangeEvent) event));
+        } else {
+            throw new IllegalStateException(
+                    subTaskId + "> PrePartition operator received an unexpected event: " + event);
         }
     }
 
@@ -102,6 +103,7 @@ public class PrePartitionOperator extends AbstractStreamOperator<PartitioningEve
                 new StreamRecord<>(
                         new PartitioningEvent(
                                 dataChangeEvent,
+                                subTaskId,
                                 cachedHashFunctions
                                                 .get(dataChangeEvent.tableId())
                                                 .hashcode(dataChangeEvent)
@@ -113,7 +115,7 @@ public class PrePartitionOperator extends AbstractStreamOperator<PartitioningEve
             // Deep-copying each event is required since downstream subTasks might run in the same
             // JVM
             Event copiedEvent = EventSerializer.INSTANCE.copy(toBroadcast);
-            output.collect(new StreamRecord<>(new PartitioningEvent(copiedEvent, i)));
+            output.collect(new StreamRecord<>(new PartitioningEvent(copiedEvent, subTaskId, i)));
         }
     }
 
