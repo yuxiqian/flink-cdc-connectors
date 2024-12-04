@@ -103,7 +103,7 @@ public abstract class PipelineTestEnvironment extends TestLogger {
         if (flinkVersion != null) {
             return Collections.singletonList(flinkVersion);
         } else {
-            return Arrays.asList("1.20.0"); // TODO: REVERT THIS
+            return Arrays.asList("1.19.1", "1.20.0");
         }
     }
 
@@ -238,6 +238,10 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                 JobStatusMessage message = jobStatusMessages.iterator().next();
                 JobStatus jobStatus = message.getJobState();
                 if (jobStatus.isTerminalState()) {
+                    System.err.println(">>> JM Log: ");
+                    System.err.println(jobManagerConsumer.toUtf8String());
+                    System.err.println(">>> TM Log: ");
+                    System.err.println(taskManagerConsumer.toUtf8String());
                     throw new ValidationException(
                             String.format(
                                     "Job has been terminated! JobName: %s, JobID: %s, Status: %s",

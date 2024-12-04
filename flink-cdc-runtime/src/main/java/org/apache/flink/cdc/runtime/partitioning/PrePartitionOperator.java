@@ -85,8 +85,10 @@ public class PrePartitionOperator extends AbstractStreamOperator<PartitioningEve
                     (tId, oldSchema) ->
                             SchemaUtils.applySchemaChangeEvent(oldSchema, schemaChangeEvent));
 
-            // Update hash function
-            hashFunctionMap.put(tableId, recreateHashFunction(tableId));
+            if (schemaMap.get(tableId) != null) {
+                // Update hash function
+                hashFunctionMap.put(tableId, recreateHashFunction(tableId));
+            }
 
             // Broadcast SchemaChangeEvent
             broadcastEvent(event);
