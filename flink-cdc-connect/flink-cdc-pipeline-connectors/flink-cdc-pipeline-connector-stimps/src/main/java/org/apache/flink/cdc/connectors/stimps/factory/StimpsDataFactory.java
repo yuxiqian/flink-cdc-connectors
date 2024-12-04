@@ -24,7 +24,7 @@ import org.apache.flink.cdc.common.factories.Factory;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.connectors.stimps.source.StimpsDataSource;
 
-import com.google.common.collect.ImmutableSet;
+import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableSet;
 
 import java.util.HashSet;
 import java.util.Set;
