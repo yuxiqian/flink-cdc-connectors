@@ -82,8 +82,6 @@ class SchemaReducingUtilsTest {
     private static final DataType TINYINT = DataTypes.TINYINT();
     private static final DataType INT = DataTypes.INT();
     private static final DataType BIGINT = DataTypes.BIGINT();
-    private static final DataType SMALL_DECIMAL =
-            DECIMAL(DecimalType.DEFAULT_PRECISION, DecimalType.DEFAULT_SCALE);
     private static final DataType DECIMAL =
             DECIMAL(DecimalType.MAX_PRECISION, DecimalType.DEFAULT_SCALE);
     private static final DataType FLOAT = DataTypes.FLOAT();
@@ -182,24 +180,44 @@ class SchemaReducingUtilsTest {
                                         .as("test fitting BIGINT into %s", type)
                                         .isFalse());
 
-        Stream.of(TINYINT, SMALLINT, INT, BIGINT, DECIMAL, FLOAT)
+        Stream.of(TINYINT, SMALLINT, INT, BIGINT, DECIMAL, STRING)
                 .forEach(
                         type ->
                                 Assertions.assertThat(
                                                 isSchemaCompatible(
-                                                        of("id", BIGINT, "number", DOUBLE),
+                                                        of("id", BIGINT, "number", STRING),
                                                         of("id", BIGINT, "number", type)))
-                                        .as("test fitting %s into DOUBLE", type)
+                                        .as("test fitting %s into STRING", type)
                                         .isTrue());
 
-        Stream.of(TINYINT, SMALLINT, INT, BIGINT, DECIMAL, FLOAT)
+        Stream.of(TINYINT, SMALLINT, INT, BIGINT, DECIMAL)
                 .forEach(
                         type ->
                                 Assertions.assertThat(
                                                 isSchemaCompatible(
                                                         of("id", BIGINT, "number", type),
-                                                        of("id", BIGINT, "number", DOUBLE)))
-                                        .as("test fitting DOUBLE into %s", type)
+                                                        of("id", BIGINT, "number", STRING)))
+                                        .as("test fitting STRING into %s", type)
+                                        .isFalse());
+
+        Stream.of(FLOAT, DOUBLE, STRING)
+                .forEach(
+                        type ->
+                                Assertions.assertThat(
+                                                isSchemaCompatible(
+                                                        of("id", BIGINT, "number", STRING),
+                                                        of("id", BIGINT, "number", type)))
+                                        .as("test fitting %s into STRING", type)
+                                        .isTrue());
+
+        Stream.of(FLOAT, DOUBLE)
+                .forEach(
+                        type ->
+                                Assertions.assertThat(
+                                                isSchemaCompatible(
+                                                        of("id", BIGINT, "number", type),
+                                                        of("id", BIGINT, "number", STRING)))
+                                        .as("test fitting STRING into %s", type)
                                         .isFalse());
 
         Assertions.assertThat(
@@ -275,25 +293,25 @@ class SchemaReducingUtilsTest {
                                         .as("test fitting BIGINT into %s", type)
                                         .isEqualTo(of("id", BIGINT, "number", BIGINT)));
 
-        Stream.of(TINYINT, SMALLINT, INT, BIGINT, DECIMAL, FLOAT)
+        Stream.of(TINYINT, SMALLINT, INT, BIGINT, DECIMAL, STRING)
                 .forEach(
                         type ->
                                 Assertions.assertThat(
                                                 getLeastCommonSchema(
-                                                        of("id", BIGINT, "number", DOUBLE),
+                                                        of("id", BIGINT, "number", STRING),
                                                         of("id", BIGINT, "number", type)))
-                                        .as("test fitting %s into DOUBLE", type)
-                                        .isEqualTo(of("id", BIGINT, "number", DOUBLE)));
+                                        .as("test fitting %s into STRING", type)
+                                        .isEqualTo(of("id", BIGINT, "number", STRING)));
 
-        Stream.of(TINYINT, SMALLINT, INT, BIGINT, DECIMAL, FLOAT)
+        Stream.of(TINYINT, SMALLINT, INT, BIGINT, DECIMAL, STRING)
                 .forEach(
                         type ->
                                 Assertions.assertThat(
                                                 getLeastCommonSchema(
                                                         of("id", BIGINT, "number", type),
-                                                        of("id", BIGINT, "number", DOUBLE)))
-                                        .as("test fitting DOUBLE into %s", type)
-                                        .isEqualTo(of("id", BIGINT, "number", DOUBLE)));
+                                                        of("id", BIGINT, "number", STRING)))
+                                        .as("test fitting STRING into %s", type)
+                                        .isEqualTo(of("id", BIGINT, "number", STRING)));
 
         Assertions.assertThat(
                         getLeastCommonSchema(
@@ -499,28 +517,28 @@ class SchemaReducingUtilsTest {
                                                         Collections.singletonMap("number", BIGINT),
                                                         Collections.singletonMap("number", type))));
 
-        Stream.of(TINYINT, SMALLINT, INT, BIGINT, DECIMAL, FLOAT)
+        Stream.of(TINYINT, SMALLINT, INT, BIGINT, DECIMAL, STRING)
                 .forEach(
                         type ->
                                 Assertions.assertThat(
                                                 mergeAndDiff(
-                                                        of("id", BIGINT, "number", DOUBLE),
+                                                        of("id", BIGINT, "number", STRING),
                                                         of("id", BIGINT, "number", type)))
-                                        .as("test fitting %s into DOUBLE", type)
+                                        .as("test fitting %s into STRING", type)
                                         .isEmpty());
 
-        Stream.of(TINYINT, SMALLINT, INT, BIGINT, DECIMAL, FLOAT)
+        Stream.of(TINYINT, SMALLINT, INT, BIGINT, DECIMAL)
                 .forEach(
                         type ->
                                 Assertions.assertThat(
                                                 mergeAndDiff(
                                                         of("id", BIGINT, "number", type),
-                                                        of("id", BIGINT, "number", DOUBLE)))
-                                        .as("test fitting DOUBLE into %s", type)
+                                                        of("id", BIGINT, "number", STRING)))
+                                        .as("test fitting STRING into %s", type)
                                         .containsExactly(
                                                 new AlterColumnTypeEvent(
                                                         TABLE_ID,
-                                                        Collections.singletonMap("number", DOUBLE),
+                                                        Collections.singletonMap("number", STRING),
                                                         Collections.singletonMap("number", type))));
 
         Assertions.assertThat(
@@ -569,8 +587,7 @@ class SchemaReducingUtilsTest {
                         Tuple2.of(SMALLINT, INT),
                         Tuple2.of(INT, BIGINT),
                         Tuple2.of(BIGINT, DECIMAL),
-                        Tuple2.of(SMALL_DECIMAL, DECIMAL),
-                        Tuple2.of(DECIMAL, FLOAT),
+                        Tuple2.of(DECIMAL, STRING),
                         Tuple2.of(FLOAT, DOUBLE),
                         Tuple2.of(DATE, TIMESTAMP),
                         Tuple2.of(TIMESTAMP, TIMESTAMP_LTZ),

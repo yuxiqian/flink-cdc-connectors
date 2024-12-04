@@ -29,9 +29,18 @@ import org.apache.flink.cdc.common.source.MetadataAccessor;
 @Internal
 public class StimpsDataSource implements DataSource {
 
+    private final int tableCount;
+    private final boolean isolationGuarantee;
+
+    public StimpsDataSource(int tableCount, boolean isolationGuarantee) {
+        this.tableCount = tableCount;
+        this.isolationGuarantee = isolationGuarantee;
+    }
+
     @Override
     public EventSourceProvider getEventSourceProvider() {
-        return FlinkSourceFunctionProvider.of(new StimpsSourceFunction());
+        return FlinkSourceFunctionProvider.of(
+                new StimpsSourceFunction(tableCount, isolationGuarantee));
     }
 
     @Override
@@ -41,6 +50,6 @@ public class StimpsDataSource implements DataSource {
 
     @Override
     public boolean guaranteesSchemaChangeIsolation() {
-        return false;
+        return isolationGuarantee;
     }
 }

@@ -24,8 +24,13 @@ import org.apache.flink.cdc.common.factories.Factory;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.connectors.stimps.source.StimpsDataSource;
 
+import com.google.common.collect.ImmutableSet;
+
 import java.util.HashSet;
 import java.util.Set;
+
+import static org.apache.flink.cdc.connectors.stimps.source.StimpsSourceOptions.ISOLATION_GUARANTEE;
+import static org.apache.flink.cdc.connectors.stimps.source.StimpsSourceOptions.TABLE_COUNT;
 
 /** A source {@link Factory} to create {@link StimpsDataSource}. */
 @Internal
@@ -35,7 +40,9 @@ public class StimpsDataFactory implements DataSourceFactory {
 
     @Override
     public DataSource createDataSource(Context context) {
-        return new StimpsDataSource();
+        int tableCount = context.getFactoryConfiguration().get(TABLE_COUNT);
+        boolean isolationGuarantee = context.getFactoryConfiguration().get(ISOLATION_GUARANTEE);
+        return new StimpsDataSource(tableCount, isolationGuarantee);
     }
 
     @Override
@@ -50,6 +57,6 @@ public class StimpsDataFactory implements DataSourceFactory {
 
     @Override
     public Set<ConfigOption<?>> optionalOptions() {
-        return new HashSet<>();
+        return ImmutableSet.of(TABLE_COUNT, ISOLATION_GUARANTEE);
     }
 }
