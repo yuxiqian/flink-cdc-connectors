@@ -48,8 +48,8 @@ import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.function.ThrowingRunnable;
 
+import org.apache.flink.shaded.guava31.com.google.common.collect.ArrayListMultimap;
 import org.apache.flink.shaded.guava31.com.google.common.collect.HashBasedTable;
-import org.apache.flink.shaded.guava31.com.google.common.collect.LinkedHashMultimap;
 import org.apache.flink.shaded.guava31.com.google.common.collect.Multimap;
 import org.apache.flink.shaded.guava31.com.google.common.collect.Table;
 
@@ -64,7 +64,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -324,99 +323,87 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
                                         !request.isAlignRequest()) // Ignore alignment only requests
                         .collect(Collectors.toList());
 
-        // Sink tables that got affected by current schema reduce
-        Set<TableId> affectedSinkTableIds = new HashSet<>();
-        Multimap<TableId, SchemaChangeEvent> affectedSinkTableIdsCause =
-                LinkedHashMultimap.create();
+        // Preparation: Group original schema change events by upstream table ID, in case if we need
+        // to forward them later.
+        Multimap<TableId, SchemaChangeEvent> schemaChangesGroupedByUpstreamTableIds =
+                ArrayListMultimap.create();
+        validSchemaReduceRequests.forEach(
+                rsr ->
+                        schemaChangesGroupedByUpstreamTableIds.put(
+                                rsr.getSchemaChangeEvent().tableId(), rsr.getSchemaChangeEvent()));
+
+        // Step 1: Based on changed upstream tables, infer a set of sink tables that might be
+        // affected by this event. Schema changes will be derived individually for each sink table.
+        Set<TableId> affectedSinkTableIds =
+                SchemaDerivator.getAffectedEvolvedTables(
+                        tableIdRouter,
+                        validSchemaReduceRequests.stream()
+                                .map(rsr -> rsr.getSchemaChangeEvent().tableId())
+                                .collect(Collectors.toSet()));
 
         List<SchemaChangeEvent> evolvedSchemaChanges = new ArrayList<>();
 
-        for (ReduceSchemaRequest schemaReduceRequest : validSchemaReduceRequests) {
-            SchemaChangeEvent schemaChangeEvent = schemaReduceRequest.getSchemaChangeEvent();
-            TableId tableId = schemaChangeEvent.tableId();
+        // For each affected sink table, we may...
+        for (TableId affectedSinkTableId : affectedSinkTableIds) {
+            List<SchemaChangeEvent> localEvolvedSchemaChanges = new ArrayList<>();
 
-            tableIdRouter
-                    .route(tableId)
-                    .forEach(
-                            sinkTableId -> {
-                                affectedSinkTableIds.add(sinkTableId);
-                                affectedSinkTableIdsCause.put(sinkTableId, schemaChangeEvent);
-                            });
-        }
+            Schema currentSinkSchema =
+                    schemaManager.getLatestEvolvedSchema(affectedSinkTableId).orElse(null);
 
-        for (TableId sinkTableId : affectedSinkTableIds) {
-            Schema oldEvolvedSchema =
-                    schemaManager.getLatestEvolvedSchema(sinkTableId).orElse(null);
-
-            // Local schema changes, before being lenientized and applied to sink
-            List<SchemaChangeEvent> localSinkTableSchemaChanges = new ArrayList<>();
-
-            // Collect all upstream schemas that merges into this sink table
-            Set<TableId> upstreamMergingTableIds =
-                    retrieveUpstreamTableIdsFromEvolvedTableId(sinkTableId);
-            Set<Schema> upstreamMergingSchemas =
-                    retrieveUpstreamSchemasFromEvolvedTableId(sinkTableId);
+            // Step 2: Reversely lookup this affected sink table's upstream dependency.
+            Set<TableId> upstreamDependencies =
+                    SchemaDerivator.reverseLookupDependingUpstreamTables(
+                            tableIdRouter, affectedSinkTableId, upstreamSchemaTable);
 
             Preconditions.checkState(
-                    !upstreamMergingTableIds.isEmpty(),
-                    "Upstream merging tableIds should never be empty.");
-            Preconditions.checkState(
-                    !upstreamMergingSchemas.isEmpty(),
-                    "Upstream merging schemas should never be empty.");
+                    !upstreamDependencies.isEmpty(),
+                    "An affected sink table's upstream dependency cannot be empty.");
 
-            // Indicating if we can forward upstream schema change events directly to sink.
-            // This could be true if:
-            // a) We're using a schema change isolated source, and there's no table merging route
-            // rules.
-            // or b), when we're using a non-isolated source, and it only presents in one single
-            // subTask, it could be safely forwarded, too.
-            boolean isSchemaChangeForwardable;
-            if (guaranteesSchemaChangeIsolation) {
-                isSchemaChangeForwardable = upstreamMergingTableIds.size() == 1;
+            // We can forward upstream schema change, iff this is a one-by-one routing rule and
+            // source could guarantee schema changes' isolation.
+            boolean isForwardable =
+                    guaranteesSchemaChangeIsolation && upstreamDependencies.size() == 1;
+
+            if (isForwardable) {
+                // Step 3a) Obtain the only dependency from upstream...
+                TableId upstreamDependencyTable = upstreamDependencies.iterator().next();
+                // ...and forward its schema change events to sink, sequentially.
+                schemaChangesGroupedByUpstreamTableIds.get(upstreamDependencyTable).stream()
+                        .map(sce -> sce.copy(affectedSinkTableId))
+                        .forEachOrdered(localEvolvedSchemaChanges::add);
             } else {
-                isSchemaChangeForwardable = upstreamMergingSchemas.size() == 1;
-            }
+                // Step 3b) For non-forwardable cases, we need to grab all upstream schemas from all
+                // known partitions and merge them.
+                Set<Schema> toBeMergedSchemas =
+                        SchemaDerivator.reverseLookupDependingUpstreamSchemas(
+                                tableIdRouter, affectedSinkTableId, upstreamSchemaTable);
 
-            if (isSchemaChangeForwardable) {
-                // This is a one-to-one relationship, we can simply forward the upstream schema
-                // changes to sink table.
-                List<SchemaChangeEvent> causeSchemaChangeEvents =
-                        new ArrayList<>(affectedSinkTableIdsCause.get(sinkTableId));
-
-                for (SchemaChangeEvent forwardedSchemaChangeEvent : causeSchemaChangeEvents) {
-                    if (!SchemaReducingUtils.isSchemaChangeEventRedundant(
-                            oldEvolvedSchema, forwardedSchemaChangeEvent)) {
-                        localSinkTableSchemaChanges.add(
-                                forwardedSchemaChangeEvent.copy(sinkTableId));
-                    } else {
-                        LOG.info(
-                                "Received a duplicate forwarded schema change event {}, ignoring it.",
-                                forwardedSchemaChangeEvent);
-                    }
-                }
-            } else {
-                Schema newEvolvedSchema = oldEvolvedSchema;
-
-                // Otherwise, we try to merge entire upstream schemas
-                for (Schema upstreamSchema : upstreamMergingSchemas) {
-                    newEvolvedSchema =
+                // In this mode, schema will never be narrowed because current schema is always one
+                // of the merging base. Notice that current schema might be NULL if it's the first
+                // time we met a CreateTableEvent.
+                Schema mergedSchema = currentSinkSchema;
+                for (Schema toBeMergedSchema : toBeMergedSchemas) {
+                    mergedSchema =
                             SchemaReducingUtils.getLeastCommonSchema(
-                                    newEvolvedSchema, upstreamSchema);
+                                    mergedSchema, toBeMergedSchema);
                 }
 
-                localSinkTableSchemaChanges.addAll(
+                localEvolvedSchemaChanges.addAll(
                         SchemaReducingUtils.getSchemaDifference(
-                                sinkTableId, oldEvolvedSchema, newEvolvedSchema));
+                                affectedSinkTableId, currentSinkSchema, mergedSchema));
             }
 
-            // Then, we rewrite schema change events based on current schema change behavior
+            // Step 4) Normalize schema change events, including rewriting events by current schema
+            // change behavior configuration, dropping explicitly excluded schema change event
+            // types.
             evolvedSchemaChanges.addAll(
                     SchemaNormalizer.normalizeSchemaChangeEvents(
-                            oldEvolvedSchema,
-                            localSinkTableSchemaChanges,
+                            currentSinkSchema,
+                            localEvolvedSchemaChanges,
                             schemaChangeBehavior,
                             metadataApplier));
         }
+
         return evolvedSchemaChanges;
     }
 
