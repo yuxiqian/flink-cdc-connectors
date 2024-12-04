@@ -19,14 +19,11 @@ package org.apache.flink.cdc.runtime.operators.sink;
 
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.runtime.operators.reducer.SchemaReducer;
 import org.apache.flink.cdc.runtime.operators.reducer.events.FlushSuccessEvent;
 import org.apache.flink.cdc.runtime.operators.reducer.events.GetEvolvedSchemaRequest;
 import org.apache.flink.cdc.runtime.operators.reducer.events.GetEvolvedSchemaResponse;
-import org.apache.flink.cdc.runtime.operators.reducer.events.GetOriginalSchemaRequest;
-import org.apache.flink.cdc.runtime.operators.reducer.events.GetOriginalSchemaResponse;
 import org.apache.flink.cdc.runtime.operators.reducer.events.SinkWriterRegisterEvent;
-import org.apache.flink.cdc.runtime.operators.schema.SchemaOperator;
-import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 import org.apache.flink.util.SerializedValue;
@@ -37,14 +34,14 @@ import java.util.Optional;
 import static org.apache.flink.cdc.runtime.operators.reducer.events.CoordinationResponseUtils.unwrap;
 
 /**
- * Client for {@link DataSinkWriterOperator} interact with {@link SchemaRegistry} when table schema
+ * Client for {@link DataSinkWriterOperator} interact with {@link SchemaReducer} when table schema
  * evolution happened.
  */
 public class SchemaEvolutionClient {
 
     private final TaskOperatorEventGateway toCoordinator;
 
-    /** a determinant OperatorID of {@link SchemaOperator}. */
+    /** a determinant OperatorID of {@link SchemaReducer}. */
     private final OperatorID schemaOperatorID;
 
     public SchemaEvolutionClient(
@@ -53,13 +50,13 @@ public class SchemaEvolutionClient {
         this.schemaOperatorID = schemaOperatorID;
     }
 
-    /** send {@link SinkWriterRegisterEvent} to {@link SchemaRegistry}. */
+    /** send {@link SinkWriterRegisterEvent} to {@link SchemaReducer}. */
     public void registerSubtask(int subtask) throws IOException {
         toCoordinator.sendOperatorEventToCoordinator(
                 schemaOperatorID, new SerializedValue<>(new SinkWriterRegisterEvent(subtask)));
     }
 
-    /** send {@link FlushSuccessEvent} to {@link SchemaRegistry}. */
+    /** send {@link FlushSuccessEvent} to {@link SchemaReducer}. */
     public void notifyFlushSuccess(int subtask) throws IOException {
         toCoordinator.sendOperatorEventToCoordinator(
                 schemaOperatorID, new SerializedValue<>(new FlushSuccessEvent(subtask)));
@@ -75,17 +72,5 @@ public class SchemaEvolutionClient {
                                                 GetEvolvedSchemaRequest.ofLatestSchema(tableId)))
                                 .get());
         return getEvolvedSchemaResponse.getSchema();
-    }
-
-    public Optional<Schema> getLatestOriginalSchema(TableId tableId) throws Exception {
-        GetOriginalSchemaResponse getOriginalSchemaResponse =
-                unwrap(
-                        toCoordinator
-                                .sendRequestToCoordinator(
-                                        schemaOperatorID,
-                                        new SerializedValue<>(
-                                                GetOriginalSchemaRequest.ofLatestSchema(tableId)))
-                                .get());
-        return getOriginalSchemaResponse.getSchema();
     }
 }

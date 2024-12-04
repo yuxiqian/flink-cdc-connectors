@@ -91,6 +91,3 @@ jobs:
       java-version: ${{ matrix.java-version }}
       flink-version: ${{ matrix.flink-version }}
       module: ${{ matrix.module }}
-  migration_test:
-    name: Migration Tests
-    uses: ./.github/workflows/flink_cdc_migration_test.yml

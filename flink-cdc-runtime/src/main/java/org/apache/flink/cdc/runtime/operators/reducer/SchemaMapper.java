@@ -27,7 +27,7 @@ import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
-import org.apache.flink.cdc.common.utils.SchemaInferencingUtils;
+import org.apache.flink.cdc.common.utils.SchemaReducingUtils;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.operators.reducer.events.BlockUpstreamRequest;
 import org.apache.flink.cdc.runtime.operators.reducer.events.CoordinationResponseUtils;
@@ -248,7 +248,7 @@ public class SchemaMapper extends AbstractStreamOperator<Event>
             List<Object> upstreamFields =
                     SchemaUtils.restoreOriginalData(dataChangeEvent.before(), upstreamSchemaReader);
             Object[] coercedRow =
-                    SchemaInferencingUtils.coerceRow(
+                    SchemaReducingUtils.coerceRow(
                             timezone, evolvedSchema, upstreamSchema, upstreamFields, toleranceMode);
 
             dataChangeEvent =
@@ -260,7 +260,7 @@ public class SchemaMapper extends AbstractStreamOperator<Event>
             List<Object> upstreamFields =
                     SchemaUtils.restoreOriginalData(dataChangeEvent.after(), upstreamSchemaReader);
             Object[] coercedRow =
-                    SchemaInferencingUtils.coerceRow(
+                    SchemaReducingUtils.coerceRow(
                             timezone, evolvedSchema, upstreamSchema, upstreamFields, toleranceMode);
 
             dataChangeEvent =

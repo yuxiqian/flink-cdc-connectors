@@ -83,7 +83,7 @@ import java.util.stream.Collectors;
  * {@link SchemaUtils}'s merging rules
  */
 @PublicEvolving
-public class SchemaInferencingUtils {
+public class SchemaReducingUtils {
     /**
      * Checking if given {@code upcomingSchema} could be fit into currently known {@code
      * currentSchema}. Current schema could be null (as the cold opening state, and in this case it

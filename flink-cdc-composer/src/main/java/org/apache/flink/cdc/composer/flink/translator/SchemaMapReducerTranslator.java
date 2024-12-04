@@ -91,4 +91,8 @@ public class SchemaMapReducerTranslator {
                 .uid(schemaMapReducerUid)
                 .setParallelism(parallelism);
     }
+
+    public String getSchemaOperatorUid() {
+        return schemaMapReducerUid;
+    }
 }

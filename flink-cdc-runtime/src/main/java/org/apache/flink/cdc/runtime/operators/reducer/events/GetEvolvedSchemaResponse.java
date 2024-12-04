@@ -19,7 +19,6 @@ package org.apache.flink.cdc.runtime.operators.reducer.events;
 
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.schema.Schema;
-import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 
 import javax.annotation.Nullable;

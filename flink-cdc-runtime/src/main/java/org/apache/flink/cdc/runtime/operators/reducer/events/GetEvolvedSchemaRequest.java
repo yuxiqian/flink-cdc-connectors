@@ -19,7 +19,6 @@ package org.apache.flink.cdc.runtime.operators.reducer.events;
 
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 
 /** Request to {@link SchemaRegistry} for getting schema of a table. */

@@ -60,15 +60,15 @@ import java.util.stream.Stream;
 
 import static org.apache.flink.cdc.common.types.DataTypes.DECIMAL;
 import static org.apache.flink.cdc.common.types.DataTypes.VARCHAR;
-import static org.apache.flink.cdc.common.utils.SchemaInferencingUtils.coerceObject;
-import static org.apache.flink.cdc.common.utils.SchemaInferencingUtils.coerceRow;
-import static org.apache.flink.cdc.common.utils.SchemaInferencingUtils.getLeastCommonSchema;
-import static org.apache.flink.cdc.common.utils.SchemaInferencingUtils.getSchemaDifference;
-import static org.apache.flink.cdc.common.utils.SchemaInferencingUtils.isDataTypeCompatible;
-import static org.apache.flink.cdc.common.utils.SchemaInferencingUtils.isSchemaCompatible;
+import static org.apache.flink.cdc.common.utils.SchemaReducingUtils.coerceObject;
+import static org.apache.flink.cdc.common.utils.SchemaReducingUtils.coerceRow;
+import static org.apache.flink.cdc.common.utils.SchemaReducingUtils.getLeastCommonSchema;
+import static org.apache.flink.cdc.common.utils.SchemaReducingUtils.getSchemaDifference;
+import static org.apache.flink.cdc.common.utils.SchemaReducingUtils.isDataTypeCompatible;
+import static org.apache.flink.cdc.common.utils.SchemaReducingUtils.isSchemaCompatible;
 
-/** A test for the {@link SchemaInferencingUtils}. */
-class SchemaInferencingUtilsTest {
+/** A test for the {@link SchemaReducingUtils}. */
+class SchemaReducingUtilsTest {
 
     private static final TableId TABLE_ID = TableId.tableId("foo", "bar", "baz");
 

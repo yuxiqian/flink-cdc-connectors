@@ -431,6 +431,11 @@ public class SchemaEvolvingTransformE2eITCase extends PipelineTestEnvironment {
             Thread.sleep(1000);
         }
         if (!result) {
+            System.out.println("=============== JM Log: ================");
+            System.out.println(jobManagerConsumer.toUtf8String());
+            System.out.println("=============== TM Log: ================");
+            System.out.println(taskManagerConsumer.toUtf8String());
+            System.out.println("========================================");
             throw new TimeoutException(
                     "failed to get specific event: "
                             + event

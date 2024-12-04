@@ -17,7 +17,7 @@
 
 package org.apache.flink.cdc.runtime.testutils.schema;
 
-import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
+import org.apache.flink.cdc.runtime.operators.reducer.SchemaReducer;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
@@ -29,30 +29,30 @@ import java.util.concurrent.CompletableFuture;
 
 /**
  * A {@link TaskOperatorEventGateway} for testing that deliver all gateway events and requests to
- * {@link SchemaRegistry}.
+ * {@link SchemaReducer}.
  */
-public class TestingSchemaRegistryGateway implements TaskOperatorEventGateway, AutoCloseable {
+public class TestingSchemaReducerGateway implements TaskOperatorEventGateway, AutoCloseable {
     public static final OperatorID SCHEMA_OPERATOR_ID = new OperatorID(15213L, 15513L);
-    private final SchemaRegistry schemaRegistry;
+    private final SchemaReducer schemaReducer;
 
-    public TestingSchemaRegistryGateway(SchemaRegistry schemaRegistry) {
-        this.schemaRegistry = schemaRegistry;
+    public TestingSchemaReducerGateway(SchemaReducer schemaReducer) {
+        this.schemaReducer = schemaReducer;
     }
 
     public void open() throws Exception {
-        schemaRegistry.start();
+        schemaReducer.start();
     }
 
     @Override
     public void close() throws Exception {
-        schemaRegistry.close();
+        schemaReducer.close();
     }
 
     @Override
     public void sendOperatorEventToCoordinator(
             OperatorID operator, SerializedValue<OperatorEvent> event) {
         try {
-            schemaRegistry.handleEventFromOperator(
+            schemaReducer.handleEventFromOperator(
                     0, 0, event.deserializeValue(Thread.currentThread().getContextClassLoader()));
         } catch (Exception e) {
             throw new RuntimeException("Unable to deliver OperatorEvent to SchemaRegistry", e);
@@ -63,7 +63,7 @@ public class TestingSchemaRegistryGateway implements TaskOperatorEventGateway, A
     public CompletableFuture<CoordinationResponse> sendRequestToCoordinator(
             OperatorID operator, SerializedValue<CoordinationRequest> request) {
         try {
-            return schemaRegistry.handleCoordinationRequest(
+            return schemaReducer.handleCoordinationRequest(
                     request.deserializeValue(Thread.currentThread().getContextClassLoader()));
         } catch (Exception e) {
             throw new RuntimeException(

@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.runtime.operators.reducer;
 
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
@@ -26,7 +27,7 @@ import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.utils.Preconditions;
-import org.apache.flink.cdc.common.utils.SchemaInferencingUtils;
+import org.apache.flink.cdc.common.utils.SchemaReducingUtils;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.operators.reducer.events.BlockUpstreamRequest;
 import org.apache.flink.cdc.runtime.operators.reducer.events.FlushSuccessEvent;
@@ -55,6 +56,7 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.Table;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 import java.io.ByteArrayInputStream;
@@ -261,7 +263,7 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
     private boolean updateUpstreamSchemaTable(
             TableId tableId, int sourcePartition, SchemaChangeEvent schemaChangeEvent) {
         Schema oldSchema = upstreamSchemaTable.get(tableId, sourcePartition);
-        if (SchemaInferencingUtils.isSchemaChangeEventRedundant(oldSchema, schemaChangeEvent)) {
+        if (SchemaReducingUtils.isSchemaChangeEventRedundant(oldSchema, schemaChangeEvent)) {
             return false;
         }
         upstreamSchemaTable.put(
@@ -382,7 +384,7 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
                         new ArrayList<>(affectedSinkTableIdsCause.get(sinkTableId));
 
                 for (SchemaChangeEvent forwardedSchemaChangeEvent : causeSchemaChangeEvents) {
-                    if (!SchemaInferencingUtils.isSchemaChangeEventRedundant(
+                    if (!SchemaReducingUtils.isSchemaChangeEventRedundant(
                             oldEvolvedSchema, forwardedSchemaChangeEvent)) {
                         localSinkTableSchemaChanges.add(
                                 forwardedSchemaChangeEvent.copy(sinkTableId));
@@ -398,12 +400,12 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
                 // Otherwise, we try to merge entire upstream schemas
                 for (Schema upstreamSchema : upstreamMergingSchemas) {
                     newEvolvedSchema =
-                            SchemaInferencingUtils.getLeastCommonSchema(
+                            SchemaReducingUtils.getLeastCommonSchema(
                                     newEvolvedSchema, upstreamSchema);
                 }
 
                 localSinkTableSchemaChanges.addAll(
-                        SchemaInferencingUtils.getSchemaDifference(
+                        SchemaReducingUtils.getSchemaDifference(
                                 sinkTableId, oldEvolvedSchema, newEvolvedSchema));
             }
 
@@ -431,11 +433,13 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
                         t);
                 return false;
             } else {
-                throw new FlinkRuntimeException(
-                        "Failed to apply schema change event "
-                                + schemaChangeEvent
-                                + ". Caused by: ",
-                        t);
+                context.failJob(
+                        new FlinkRuntimeException(
+                                "Failed to apply schema change event "
+                                        + schemaChangeEvent
+                                        + ". Caused by: ",
+                                t));
+                throw t;
             }
         }
     }
@@ -650,5 +654,16 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
                         upstreamTableId ->
                                 upstreamSchemaTable.row(upstreamTableId).values().stream())
                 .collect(Collectors.toSet());
+    }
+
+    @VisibleForTesting
+    public void emplaceUpstreamSchema(
+            @Nonnull TableId tableId, int sourcePartition, @Nonnull Schema schema) {
+        upstreamSchemaTable.put(tableId, sourcePartition, schema);
+    }
+
+    @VisibleForTesting
+    public void emplaceEvolvedSchema(@Nonnull TableId tableId, @Nonnull Schema schema) {
+        schemaManager.emplaceEvolvedSchema(tableId, schema);
     }
 }

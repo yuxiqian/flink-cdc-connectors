@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.runtime.operators.reducer.events;
 
-import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;
 
 import java.util.Objects;

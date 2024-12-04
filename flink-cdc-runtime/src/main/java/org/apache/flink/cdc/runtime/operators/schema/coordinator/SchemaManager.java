@@ -18,12 +18,12 @@
 package org.apache.flink.cdc.runtime.operators.schema.coordinator;
 
 import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Schema;
-import org.apache.flink.cdc.common.utils.SchemaInferencingUtils;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.serializer.TableIdSerializer;
 import org.apache.flink.cdc.runtime.serializer.schema.SchemaSerializer;
@@ -94,41 +94,15 @@ public class SchemaManager {
         return behavior;
     }
 
-    /**
-     * This function checks if the given schema change event has been applied already. If so, it
-     * will be ignored to avoid sending duplicate evolved schema change events to sink metadata
-     * applier.
-     */
-    public final boolean isOriginalSchemaChangeEventRedundant(SchemaChangeEvent event) {
-        TableId tableId = event.tableId();
-        Optional<Schema> latestSchema = getLatestOriginalSchema(tableId);
-        return SchemaInferencingUtils.isSchemaChangeEventRedundant(
-                latestSchema.orElse(null), event);
-    }
-
     public final boolean schemaExists(
             Map<TableId, SortedMap<Integer, Schema>> schemaMap, TableId tableId) {
         return schemaMap.containsKey(tableId) && !schemaMap.get(tableId).isEmpty();
-    }
-
-    public final boolean originalSchemaExists(TableId tableId) {
-        return schemaExists(originalSchemas, tableId);
-    }
-
-    public final boolean evolvedSchemaExists(TableId tableId) {
-        return schemaExists(evolvedSchemas, tableId);
     }
 
     /** Get the latest evolved schema of the specified table. */
     public Optional<Schema> getLatestEvolvedSchema(TableId tableId) {
         return getLatestSchemaVersion(evolvedSchemas, tableId)
                 .map(version -> evolvedSchemas.get(tableId).get(version));
-    }
-
-    /** Get the latest original schema of the specified table. */
-    public Optional<Schema> getLatestOriginalSchema(TableId tableId) {
-        return getLatestSchemaVersion(originalSchemas, tableId)
-                .map(version -> originalSchemas.get(tableId).get(version));
     }
 
     /** Get schema at the specified version of a table. */
@@ -144,40 +118,6 @@ public class SchemaManager {
                 version,
                 tableId);
         return versionedSchemas.get(version);
-    }
-
-    /** Get schema at the specified version of a table. */
-    public Schema getOriginalSchema(TableId tableId, int version) {
-        checkArgument(
-                originalSchemas.containsKey(tableId),
-                "Unable to find original schema for table \"%s\"",
-                tableId);
-        SortedMap<Integer, Schema> versionedSchemas = originalSchemas.get(tableId);
-        checkArgument(
-                versionedSchemas.containsKey(version),
-                "Schema version %s does not exist for table \"%s\"",
-                version,
-                tableId);
-        return versionedSchemas.get(version);
-    }
-
-    /** Apply schema change to a table. */
-    public void applyOriginalSchemaChange(SchemaChangeEvent schemaChangeEvent) {
-        if (schemaChangeEvent instanceof CreateTableEvent) {
-            handleCreateTableEvent(originalSchemas, ((CreateTableEvent) schemaChangeEvent));
-        } else {
-            Optional<Schema> optionalSchema = getLatestOriginalSchema(schemaChangeEvent.tableId());
-            checkArgument(
-                    optionalSchema.isPresent(),
-                    "Unable to apply SchemaChangeEvent for table \"%s\" without existing schema",
-                    schemaChangeEvent.tableId());
-
-            LOG.info("Handling original schema change event: {}", schemaChangeEvent);
-            registerNewSchema(
-                    originalSchemas,
-                    schemaChangeEvent.tableId(),
-                    SchemaUtils.applySchemaChangeEvent(optionalSchema.get(), schemaChangeEvent));
-        }
     }
 
     /** Apply schema change to a table. */
@@ -197,6 +137,12 @@ public class SchemaManager {
                     schemaChangeEvent.tableId(),
                     SchemaUtils.applySchemaChangeEvent(optionalSchema.get(), schemaChangeEvent));
         }
+    }
+
+    /** Emplace known schema maps. */
+    @VisibleForTesting
+    public void emplaceEvolvedSchema(TableId tableId, Schema schema) {
+        registerNewSchema(evolvedSchemas, tableId, schema);
     }
 
     @Override

@@ -17,24 +17,20 @@
 
 package org.apache.flink.cdc.runtime.testutils.operators;
 
-import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.runtime.operators.reducer.SchemaReducer;
 import org.apache.flink.cdc.runtime.operators.reducer.events.FlushSuccessEvent;
 import org.apache.flink.cdc.runtime.operators.reducer.events.GetEvolvedSchemaRequest;
 import org.apache.flink.cdc.runtime.operators.reducer.events.GetEvolvedSchemaResponse;
-import org.apache.flink.cdc.runtime.operators.reducer.events.GetOriginalSchemaRequest;
-import org.apache.flink.cdc.runtime.operators.reducer.events.GetOriginalSchemaResponse;
 import org.apache.flink.cdc.runtime.operators.reducer.events.SinkWriterRegisterEvent;
-import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
-import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeRequest;
 import org.apache.flink.cdc.runtime.operators.sink.SchemaEvolutionClient;
 import org.apache.flink.cdc.runtime.testutils.schema.CollectingMetadataApplier;
-import org.apache.flink.cdc.runtime.testutils.schema.TestingSchemaRegistryGateway;
+import org.apache.flink.cdc.runtime.testutils.schema.TestingSchemaReducerGateway;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
@@ -64,8 +60,8 @@ import static org.apache.flink.cdc.runtime.operators.reducer.events.Coordination
  * Harness for testing customized operators handling {@link Event}s in CDC pipeline.
  *
  * <p>In addition to regular operator context and lifecycle management, this test harness also wraps
- * {@link TestingSchemaRegistryGateway} into the context of tested operator, in order to support
- * testing operators that have interaction with {@link SchemaRegistry} via {@link
+ * {@link TestingSchemaReducerGateway} into the context of tested operator, in order to support
+ * testing operators that have interaction with {@link SchemaReducer} via {@link
  * SchemaEvolutionClient}.
  *
  * @param <OP> Type of the operator
@@ -79,13 +75,13 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
 
     private final OP operator;
     private final int numOutputs;
-    private final SchemaRegistry schemaRegistry;
-    private final TestingSchemaRegistryGateway schemaRegistryGateway;
+    private final SchemaReducer schemaReducer;
+    private final TestingSchemaReducerGateway schemaReducerGateway;
     private final LinkedList<StreamRecord<E>> outputRecords = new LinkedList<>();
     private final MockedOperatorCoordinatorContext mockedContext;
 
     public EventOperatorTestHarness(OP operator, int numOutputs) {
-        this(operator, numOutputs, null, SchemaChangeBehavior.EVOLVE);
+        this(operator, numOutputs, null);
     }
 
     public EventOperatorTestHarness(OP operator, int numOutputs, Duration duration) {
@@ -93,21 +89,34 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
     }
 
     public EventOperatorTestHarness(
-            OP operator, int numOutputs, Duration duration, SchemaChangeBehavior behavior) {
+            OP operator,
+            int numOutputs,
+            Duration duration,
+            SchemaChangeBehavior schemaChangeBehavior) {
+        this(operator, numOutputs, duration, SchemaChangeBehavior.EVOLVE, true);
+    }
+
+    public EventOperatorTestHarness(
+            OP operator,
+            int numOutputs,
+            Duration duration,
+            SchemaChangeBehavior behavior,
+            boolean guaranteesSchemaChangeIsolation) {
         this.operator = operator;
         this.numOutputs = numOutputs;
         this.mockedContext =
                 new MockedOperatorCoordinatorContext(
                         SCHEMA_OPERATOR_ID, Thread.currentThread().getContextClassLoader());
-        schemaRegistry =
-                new SchemaRegistry(
-                        "SchemaOperator",
+        schemaReducer =
+                new SchemaReducer(
+                        "SchemaReducer",
                         mockedContext,
                         Executors.newFixedThreadPool(1),
                         new CollectingMetadataApplier(duration),
+                        behavior,
                         new ArrayList<>(),
-                        behavior);
-        schemaRegistryGateway = new TestingSchemaRegistryGateway(schemaRegistry);
+                        guaranteesSchemaChangeIsolation);
+        schemaReducerGateway = new TestingSchemaReducerGateway(schemaReducer);
     }
 
     public EventOperatorTestHarness(
@@ -116,20 +125,31 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
             Duration duration,
             SchemaChangeBehavior behavior,
             Set<SchemaChangeEventType> enabledEventTypes) {
+        this(operator, numOutputs, duration, behavior, enabledEventTypes, true);
+    }
+
+    public EventOperatorTestHarness(
+            OP operator,
+            int numOutputs,
+            Duration duration,
+            SchemaChangeBehavior behavior,
+            Set<SchemaChangeEventType> enabledEventTypes,
+            boolean guaranteesSchemaChangeIsolation) {
         this.operator = operator;
         this.numOutputs = numOutputs;
         this.mockedContext =
                 new MockedOperatorCoordinatorContext(
                         SCHEMA_OPERATOR_ID, Thread.currentThread().getContextClassLoader());
-        schemaRegistry =
-                new SchemaRegistry(
-                        "SchemaOperator",
+        schemaReducer =
+                new SchemaReducer(
+                        "SchemaReducer",
                         mockedContext,
                         Executors.newFixedThreadPool(1),
                         new CollectingMetadataApplier(duration, enabledEventTypes),
+                        behavior,
                         new ArrayList<>(),
-                        behavior);
-        schemaRegistryGateway = new TestingSchemaRegistryGateway(schemaRegistry);
+                        guaranteesSchemaChangeIsolation);
+        schemaReducerGateway = new TestingSchemaReducerGateway(schemaReducer);
     }
 
     public EventOperatorTestHarness(
@@ -139,24 +159,37 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
             SchemaChangeBehavior behavior,
             Set<SchemaChangeEventType> enabledEventTypes,
             Set<SchemaChangeEventType> errorsOnEventTypes) {
+        this(operator, numOutputs, duration, behavior, enabledEventTypes, errorsOnEventTypes, true);
+    }
+
+    public EventOperatorTestHarness(
+            OP operator,
+            int numOutputs,
+            Duration duration,
+            SchemaChangeBehavior behavior,
+            Set<SchemaChangeEventType> enabledEventTypes,
+            Set<SchemaChangeEventType> errorsOnEventTypes,
+            boolean guaranteesSchemaChangeIsolation) {
         this.operator = operator;
         this.numOutputs = numOutputs;
         this.mockedContext =
                 new MockedOperatorCoordinatorContext(
                         SCHEMA_OPERATOR_ID, Thread.currentThread().getContextClassLoader());
-        schemaRegistry =
-                new SchemaRegistry(
-                        "SchemaOperator",
+        schemaReducer =
+                new SchemaReducer(
+                        "SchemaReducer",
                         mockedContext,
                         Executors.newFixedThreadPool(1),
                         new CollectingMetadataApplier(
                                 duration, enabledEventTypes, errorsOnEventTypes),
+                        behavior,
                         new ArrayList<>(),
-                        behavior);
-        schemaRegistryGateway = new TestingSchemaRegistryGateway(schemaRegistry);
+                        guaranteesSchemaChangeIsolation);
+        schemaReducerGateway = new TestingSchemaReducerGateway(schemaReducer);
     }
 
     public void open() throws Exception {
+        schemaReducer.start();
         initializeOperator();
         operator.open();
     }
@@ -174,29 +207,14 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
     }
 
     public void registerTableSchema(TableId tableId, Schema schema) {
-        schemaRegistry.handleCoordinationRequest(
-                new SchemaChangeRequest(tableId, new CreateTableEvent(tableId, schema), 0));
-        schemaRegistry.handleApplyEvolvedSchemaChangeRequest(new CreateTableEvent(tableId, schema));
-    }
-
-    public Schema getLatestOriginalSchema(TableId tableId) throws Exception {
-        return ((GetOriginalSchemaResponse)
-                        unwrap(
-                                schemaRegistry
-                                        .handleCoordinationRequest(
-                                                new GetOriginalSchemaRequest(
-                                                        tableId,
-                                                        GetOriginalSchemaRequest
-                                                                .LATEST_SCHEMA_VERSION))
-                                        .get()))
-                .getSchema()
-                .orElse(null);
+        schemaReducer.emplaceUpstreamSchema(tableId, 0, schema);
+        schemaReducer.emplaceEvolvedSchema(tableId, schema);
     }
 
     public Schema getLatestEvolvedSchema(TableId tableId) throws Exception {
         return ((GetEvolvedSchemaResponse)
                         unwrap(
-                                schemaRegistry
+                                schemaReducer
                                         .handleCoordinationRequest(
                                                 new GetEvolvedSchemaRequest(
                                                         tableId,
@@ -224,10 +242,10 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
 
     private void initializeOperator() throws Exception {
         operator.setup(
-                new MockStreamTask(schemaRegistryGateway),
+                new MockStreamTask(schemaReducerGateway),
                 new MockStreamConfig(new Configuration(), numOutputs),
-                new EventCollectingOutput<>(outputRecords, schemaRegistryGateway));
-        schemaRegistryGateway.sendOperatorEventToCoordinator(
+                new EventCollectingOutput<>(outputRecords, schemaReducerGateway));
+        schemaReducerGateway.sendOperatorEventToCoordinator(
                 SINK_OPERATOR_ID, new SerializedValue<>(new SinkWriterRegisterEvent(0)));
     }
 
@@ -236,11 +254,11 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
     private static class EventCollectingOutput<E extends Event> implements Output<StreamRecord<E>> {
         private final LinkedList<StreamRecord<E>> outputRecords;
 
-        private final TestingSchemaRegistryGateway schemaRegistryGateway;
+        private final TestingSchemaReducerGateway schemaRegistryGateway;
 
         public EventCollectingOutput(
                 LinkedList<StreamRecord<E>> outputRecords,
-                TestingSchemaRegistryGateway schemaRegistryGateway) {
+                TestingSchemaReducerGateway schemaRegistryGateway) {
             this.outputRecords = outputRecords;
             this.schemaRegistryGateway = schemaRegistryGateway;
         }
@@ -287,7 +305,7 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
     }
 
     private static class MockStreamTask extends StreamTask<Event, AbstractStreamOperator<Event>> {
-        protected MockStreamTask(TestingSchemaRegistryGateway schemaRegistryGateway)
+        protected MockStreamTask(TestingSchemaReducerGateway schemaRegistryGateway)
                 throws Exception {
             super(new SchemaRegistryCoordinatingEnvironment(schemaRegistryGateway));
         }
@@ -297,10 +315,10 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
     }
 
     private static class SchemaRegistryCoordinatingEnvironment extends DummyEnvironment {
-        private final TestingSchemaRegistryGateway schemaRegistryGateway;
+        private final TestingSchemaReducerGateway schemaRegistryGateway;
 
         public SchemaRegistryCoordinatingEnvironment(
-                TestingSchemaRegistryGateway schemaRegistryGateway) {
+                TestingSchemaReducerGateway schemaRegistryGateway) {
             this.schemaRegistryGateway = schemaRegistryGateway;
         }
 

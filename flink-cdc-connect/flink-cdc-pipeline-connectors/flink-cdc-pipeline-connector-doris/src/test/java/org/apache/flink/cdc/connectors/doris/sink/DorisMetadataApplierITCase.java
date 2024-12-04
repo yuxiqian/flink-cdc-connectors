@@ -36,9 +36,10 @@ import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.composer.definition.SinkDef;
 import org.apache.flink.cdc.composer.flink.coordination.OperatorIDGenerator;
 import org.apache.flink.cdc.composer.flink.translator.DataSinkTranslator;
-import org.apache.flink.cdc.composer.flink.translator.SchemaOperatorTranslator;
+import org.apache.flink.cdc.composer.flink.translator.SchemaMapReducerTranslator;
 import org.apache.flink.cdc.connectors.doris.sink.utils.DorisContainer;
 import org.apache.flink.cdc.connectors.doris.sink.utils.DorisSinkTestBase;
+import org.apache.flink.cdc.runtime.partitioning.PartitioningEvent;
 import org.apache.flink.runtime.client.JobExecutionException;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -430,7 +431,12 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
     }
 
     private void runJobWithEvents(List<Event> events) throws Exception {
-        DataStream<Event> stream = env.fromCollection(events, TypeInformation.of(Event.class));
+        List<PartitioningEvent> partitioningEvents =
+                events.stream()
+                        .map(evt -> new PartitioningEvent(evt, 0, 0))
+                        .collect(Collectors.toList());
+        DataStream<PartitioningEvent> stream =
+                env.fromCollection(partitioningEvents, TypeInformation.of(PartitioningEvent.class));
 
         Configuration config =
                 new Configuration()
@@ -447,18 +453,15 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
 
         DataSink dorisSink = createDorisDataSink(config);
 
-        SchemaOperatorTranslator schemaOperatorTranslator =
-                new SchemaOperatorTranslator(
-                        SchemaChangeBehavior.EVOLVE,
-                        "$$_schema_operator_$$",
-                        DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT,
-                        "UTC");
+        SchemaMapReducerTranslator schemaMapReducerTranslator =
+                new SchemaMapReducerTranslator(
+                        "$$_schema_operator_$$", DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT, "UTC");
 
         OperatorIDGenerator schemaOperatorIDGenerator =
-                new OperatorIDGenerator(schemaOperatorTranslator.getSchemaOperatorUid());
+                new OperatorIDGenerator(schemaMapReducerTranslator.getSchemaOperatorUid());
 
-        stream =
-                schemaOperatorTranslator.translate(
+        DataStream<Event> eventStream =
+                schemaMapReducerTranslator.translate(
                         stream,
                         DEFAULT_PARALLELISM,
                         dorisSink
@@ -466,12 +469,14 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
                                 .setAcceptedSchemaEvolutionTypes(
                                         Arrays.stream(SchemaChangeEventTypeFamily.ALL)
                                                 .collect(Collectors.toSet())),
-                        new ArrayList<>());
+                        SchemaChangeBehavior.EVOLVE,
+                        new ArrayList<>(),
+                        true);
 
         DataSinkTranslator sinkTranslator = new DataSinkTranslator();
         sinkTranslator.translate(
                 new SinkDef("doris", "Dummy Doris Sink", config),
-                stream,
+                eventStream,
                 dorisSink,
                 schemaOperatorIDGenerator.generate());
 
