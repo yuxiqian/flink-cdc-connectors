@@ -99,6 +99,10 @@ public class SchemaManager {
         return schemaMap.containsKey(tableId) && !schemaMap.get(tableId).isEmpty();
     }
 
+    public final boolean evolvedSchemaExists(TableId tableId) {
+        return evolvedSchemas.containsKey(tableId) && !evolvedSchemas.get(tableId).isEmpty();
+    }
+
     /** Get the latest evolved schema of the specified table. */
     public Optional<Schema> getLatestEvolvedSchema(TableId tableId) {
         return getLatestSchemaVersion(evolvedSchemas, tableId)

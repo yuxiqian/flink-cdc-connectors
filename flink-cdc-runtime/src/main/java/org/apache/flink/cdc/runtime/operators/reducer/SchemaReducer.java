@@ -19,6 +19,7 @@ package org.apache.flink.cdc.runtime.operators.reducer;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
+import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
@@ -50,6 +51,7 @@ import org.apache.flink.util.function.ThrowingRunnable;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ArrayListMultimap;
 import org.apache.flink.shaded.guava31.com.google.common.collect.HashBasedTable;
+import org.apache.flink.shaded.guava31.com.google.common.collect.HashMultimap;
 import org.apache.flink.shaded.guava31.com.google.common.collect.Multimap;
 import org.apache.flink.shaded.guava31.com.google.common.collect.Table;
 
@@ -64,6 +66,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -136,6 +139,9 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
     // emitted in `processElement` method.
     private transient AtomicInteger schemaMapperSeqNum;
 
+    private transient Multimap<Tuple2<Integer, SchemaChangeEvent>, Integer>
+            alreadyHandledSchemaChangeEvents;
+
     // -------------------------
     // Lifecycle methods
     // -------------------------
@@ -153,6 +159,7 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
         this.upstreamSchemaTable = HashBasedTable.create();
         this.tableIdRouter = new TableIdRouter(routingRules);
         this.schemaMapperSeqNum = new AtomicInteger(0);
+        this.alreadyHandledSchemaChangeEvents = HashMultimap.create();
         LOG.info(
                 "Started SchemaRegistry for {}. Parallelism: {}", operatorName, currentParallelism);
     }
@@ -224,13 +231,45 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
     private void handleReduceSchemaRequest(
             ReduceSchemaRequest request, CompletableFuture<CoordinationResponse> responseFuture) {
         LOG.info("Reducer received schema reduce request {}.", request);
-        pendingRequests.put(request.getSinkSubTaskId(), Tuple2.of(request, responseFuture));
-
         if (!request.isAlignRequest()) {
+            LOG.info("It's not an align request, will try to deduplicate.");
+            int eventSourcePartitionId = request.getSourceSubTaskId();
+            int handlingSinkSubTaskId = request.getSinkSubTaskId();
             SchemaChangeEvent schemaChangeEvent = request.getSchemaChangeEvent();
-            updateUpstreamSchemaTable(
-                    schemaChangeEvent.tableId(), request.getSourceSubTaskId(), schemaChangeEvent);
+            Tuple2<Integer, SchemaChangeEvent> uniqueKey =
+                    Tuple2.of(eventSourcePartitionId, schemaChangeEvent);
+            // Due to the existence of Partitioning Operator, any upstream event will be broadcast
+            // to sink N (N = sink parallelism) times.
+            // Only the first one should take effect, so we rewrite any other duplicated requests as
+            // a no-op align request.
+            alreadyHandledSchemaChangeEvents.put(uniqueKey, handlingSinkSubTaskId);
+            Collection<Integer> reportedSinkSubTasks =
+                    alreadyHandledSchemaChangeEvents.get(uniqueKey);
+            if (reportedSinkSubTasks.size() == 1) {
+                LOG.info("It's a new request for {}, will handle it", uniqueKey);
+                updateUpstreamSchemaTable(
+                        schemaChangeEvent.tableId(),
+                        request.getSourceSubTaskId(),
+                        schemaChangeEvent);
+            } else {
+                LOG.info(
+                        "It's an already handled event {}. It has been handled by {}",
+                        uniqueKey,
+                        reportedSinkSubTasks);
+                request = ReduceSchemaRequest.createAlignRequest(handlingSinkSubTaskId);
+            }
+            // Moreover, if we've collected all sink subTasks' request, remove it from memory since
+            // no more will be possible.
+            if (reportedSinkSubTasks.size() == currentParallelism) {
+                LOG.info(
+                        "All sink subTasks ({}) have already reported request {}. Remove it out of tracking.",
+                        reportedSinkSubTasks,
+                        uniqueKey);
+                alreadyHandledSchemaChangeEvents.removeAll(request);
+            }
         }
+
+        pendingRequests.put(request.getSinkSubTaskId(), Tuple2.of(request, responseFuture));
 
         if (pendingRequests.size() == 1) {
             Preconditions.checkState(
@@ -259,17 +298,13 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
      * tableId} and {@code sourcePartition}. Returns {@code true} if schema got changed, or {@code
      * false} if nothing gets touched.
      */
-    private boolean updateUpstreamSchemaTable(
+    private void updateUpstreamSchemaTable(
             TableId tableId, int sourcePartition, SchemaChangeEvent schemaChangeEvent) {
         Schema oldSchema = upstreamSchemaTable.get(tableId, sourcePartition);
-        if (SchemaReducingUtils.isSchemaChangeEventRedundant(oldSchema, schemaChangeEvent)) {
-            return false;
-        }
         upstreamSchemaTable.put(
                 tableId,
                 sourcePartition,
                 SchemaUtils.applySchemaChangeEvent(oldSchema, schemaChangeEvent));
-        return true;
     }
 
     private void startSchemaChangesReduce() {
@@ -368,9 +403,21 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
                 // Step 3a) Obtain the only dependency from upstream...
                 TableId upstreamDependencyTable = upstreamDependencies.iterator().next();
                 // ...and forward its schema change events to sink, sequentially.
-                schemaChangesGroupedByUpstreamTableIds.get(upstreamDependencyTable).stream()
-                        .map(sce -> sce.copy(affectedSinkTableId))
-                        .forEachOrdered(localEvolvedSchemaChanges::add);
+
+                // Notice that even we're using schema isolation-guaranteed sources, identical
+                // CreateTableEvent might be emitted from all source subTasks before starting
+                // snapshot phase. This is tolerable and we don't need to handle it multiple times.
+                for (SchemaChangeEvent schemaChangeEvent :
+                        schemaChangesGroupedByUpstreamTableIds.get(upstreamDependencyTable)) {
+                    if (schemaChangeEvent instanceof CreateTableEvent
+                            && schemaManager.evolvedSchemaExists(affectedSinkTableId)) {
+                        LOG.info(
+                                "Refused to forward duplicate CreateTableEvent {} since it already exists.",
+                                schemaChangeEvent);
+                    } else {
+                        localEvolvedSchemaChanges.add(schemaChangeEvent.copy(affectedSinkTableId));
+                    }
+                }
             } else {
                 // Step 3b) For non-forwardable cases, we need to grab all upstream schemas from all
                 // known partitions and merge them.
