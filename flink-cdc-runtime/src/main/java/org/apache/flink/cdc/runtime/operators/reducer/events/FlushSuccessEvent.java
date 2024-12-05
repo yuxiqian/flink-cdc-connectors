@@ -17,12 +17,13 @@
 
 package org.apache.flink.cdc.runtime.operators.reducer.events;
 
+import org.apache.flink.cdc.runtime.operators.reducer.SchemaReducer;
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;
 
 import java.util.Objects;
 
 /**
- * A {@link OperatorEvent} from sink writer to notify {@link SchemaRegistry} that it finished
+ * A {@link OperatorEvent} from sink writer to notify {@link SchemaReducer} that it finished
  * flushing.
  */
 public class FlushSuccessEvent implements OperatorEvent {

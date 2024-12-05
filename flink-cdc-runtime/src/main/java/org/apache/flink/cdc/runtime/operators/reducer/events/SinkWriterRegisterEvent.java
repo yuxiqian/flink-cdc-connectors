@@ -17,11 +17,12 @@
 
 package org.apache.flink.cdc.runtime.operators.reducer.events;
 
+import org.apache.flink.cdc.runtime.operators.reducer.SchemaReducer;
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;
 
 import java.util.Objects;
 
-/** A {@link OperatorEvent} that register sink writer to {@link SchemaRegistry}. */
+/** A {@link OperatorEvent} that register sink writer to {@link SchemaReducer}. */
 public class SinkWriterRegisterEvent implements OperatorEvent {
 
     private static final long serialVersionUID = 1L;

@@ -547,7 +547,7 @@ public class MySqlStreamingChangeEventSource
      * processed the binlog to this point.
      *
      * <p>Note that this captures the current GTID and complete GTID set, regardless of whether the
-     * connector is {@link MySqlTaskContext#gtidSourceFilter() filtering} the GTID set upon
+     * connector is {@code MySqlTaskContext#gtidSourceFilter() filtering} the GTID set upon
      * connection. We do this because we actually want to capture all GTID set values found in the
      * binlog, whether or not we process them. However, only when we connect do we actually want to
      * pass to MySQL only those GTID ranges that are applicable per the configuration.
@@ -1363,7 +1363,7 @@ public class MySqlStreamingChangeEventSource
     }
 
     /**
-     * Apply the include/exclude GTID source filters to the current {@link #source() GTID set} and
+     * Apply the include/exclude GTID source filters to the current {@code #source() GTID set} and
      * merge them onto the currently available GTID set from a MySQL server.
      *
      * <p>The merging behavior of this method might seem a bit strange at first. It's required in

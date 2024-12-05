@@ -39,7 +39,7 @@ public abstract class HistorizedRelationalDatabaseConnectorConfig
     private final boolean multiPartitionMode;
 
     /**
-     * The database history class is hidden in the {@link #configDef()} since that is designed to
+     * The database history class is hidden in the {@code #configDef()} since that is designed to
      * work with a user interface, and in these situations using Kafka is the only way to go.
      */
     public static final Field DATABASE_HISTORY =

@@ -146,7 +146,7 @@ public class MySqlValueConverters extends JdbcValueConverters {
      * @param binaryMode how binary columns should be represented
      * @param adjuster a temporal adjuster to make a database specific time modification before
      *     conversion
-     * @param handler for errors during postponed binlog parsing
+     * @param parsingErrorHandler for errors during postponed binlog parsing
      */
     public MySqlValueConverters(
             DecimalMode decimalMode,

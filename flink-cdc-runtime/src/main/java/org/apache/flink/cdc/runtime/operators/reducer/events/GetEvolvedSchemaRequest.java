@@ -19,9 +19,10 @@ package org.apache.flink.cdc.runtime.operators.reducer.events;
 
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.runtime.operators.reducer.SchemaReducer;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 
-/** Request to {@link SchemaRegistry} for getting schema of a table. */
+/** Request to {@link SchemaReducer} for getting schema of a table. */
 @Internal
 public class GetEvolvedSchemaRequest implements CoordinationRequest {
     public static final int LATEST_SCHEMA_VERSION = -1;

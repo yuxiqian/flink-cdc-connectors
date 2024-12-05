@@ -38,7 +38,7 @@ import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
-/** Operator for processing events from {@link SchemaOperator} before {@link EventPartitioner}. */
+/** Operator for processing events before {@link EventPartitioner}. */
 @Internal
 public class PrePartitionOperator extends AbstractStreamOperator<PartitioningEvent>
         implements OneInputStreamOperator<Event, PartitioningEvent>, Serializable {
