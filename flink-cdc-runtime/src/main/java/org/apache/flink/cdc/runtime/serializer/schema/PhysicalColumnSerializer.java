@@ -42,7 +42,7 @@ public class PhysicalColumnSerializer extends TypeSerializerSingleton<PhysicalCo
     private final DataTypeSerializer dataTypeSerializer = new DataTypeSerializer();
     private final StringSerializer stringSerializer = StringSerializer.INSTANCE;
 
-    private static final int CURRENT_VERSION = 2;
+    private static final int CURRENT_VERSION = 3;
 
     @Override
     public boolean isImmutableType() {
@@ -97,6 +97,7 @@ public class PhysicalColumnSerializer extends TypeSerializerSingleton<PhysicalCo
                     return Column.physicalColumn(name, dataType, comment);
                 }
             case 2:
+            case 3:
                 {
                     String name = stringSerializer.deserialize(source);
                     DataType dataType = dataTypeSerializer.deserialize(source);
