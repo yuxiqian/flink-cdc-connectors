@@ -39,7 +39,6 @@ import org.apache.flink.cdc.runtime.operators.reducer.events.ReduceSchemaRespons
 import org.apache.flink.cdc.runtime.operators.reducer.events.SinkWriterRegisterEvent;
 import org.apache.flink.cdc.runtime.operators.reducer.utils.SchemaNormalizer;
 import org.apache.flink.cdc.runtime.operators.reducer.utils.TableIdRouter;
-import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaManager;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequestHandler;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
@@ -383,7 +382,7 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
             List<SchemaChangeEvent> localEvolvedSchemaChanges = new ArrayList<>();
 
             Schema currentSinkSchema =
-                    schemaManager.getLatestEvolvedSchema(affectedSinkTableId).orElse(null);
+                    schemaManager.getLatestSchema(affectedSinkTableId).orElse(null);
 
             // Step 2: Reversely lookup this affected sink table's upstream dependency.
             Set<TableId> upstreamDependencies =
@@ -410,7 +409,7 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
                 for (SchemaChangeEvent schemaChangeEvent :
                         schemaChangesGroupedByUpstreamTableIds.get(upstreamDependencyTable)) {
                     if (schemaChangeEvent instanceof CreateTableEvent
-                            && schemaManager.evolvedSchemaExists(affectedSinkTableId)) {
+                            && schemaManager.schemaExists(affectedSinkTableId)) {
                         LOG.info(
                                 "Refused to forward duplicate CreateTableEvent {} since it already exists.",
                                 schemaChangeEvent);
@@ -457,7 +456,7 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
     private boolean applyAndUpdateEvolvedSchemaChange(SchemaChangeEvent schemaChangeEvent) {
         try {
             metadataApplier.applySchemaChange(schemaChangeEvent);
-            schemaManager.applyEvolvedSchemaChange(schemaChangeEvent);
+            schemaManager.applySchemaChange(schemaChangeEvent);
             return true;
         } catch (Throwable t) {
             if (shouldIgnoreException(t)) {
@@ -515,13 +514,13 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
             response.complete(
                     wrap(
                             new GetEvolvedSchemaResponse(
-                                    schemaManager.getLatestEvolvedSchema(tableId).orElse(null))));
+                                    schemaManager.getLatestSchema(tableId).orElse(null))));
         } else {
             try {
                 response.complete(
                         wrap(
                                 new GetEvolvedSchemaResponse(
-                                        schemaManager.getEvolvedSchema(tableId, schemaVersion))));
+                                        schemaManager.getSchema(tableId, schemaVersion))));
             } catch (IllegalArgumentException iae) {
                 LOG.warn(
                         "Some client is requesting an non-existed evolved schema for table {} with version {}",
@@ -643,17 +642,6 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
         EVOLVING
     }
 
-    private void loopWhen(Supplier<Boolean> conditionChecker) {
-        while (conditionChecker.get()) {
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new RuntimeException(e);
-            }
-        }
-    }
-
     private void loopWhen(Supplier<Boolean> conditionChecker, Runnable message) {
         while (conditionChecker.get()) {
             message.run();
@@ -674,22 +662,6 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
                 && (schemaChangeBehavior == SchemaChangeBehavior.TRY_EVOLVE);
     }
 
-    private Set<TableId> retrieveUpstreamTableIdsFromEvolvedTableId(TableId evolvedTableId) {
-        return upstreamSchemaTable.rowKeySet().stream()
-                .filter(
-                        upstreamTableId ->
-                                tableIdRouter.route(upstreamTableId).contains(evolvedTableId))
-                .collect(Collectors.toSet());
-    }
-
-    private Set<Schema> retrieveUpstreamSchemasFromEvolvedTableId(TableId evolvedTableId) {
-        return retrieveUpstreamTableIdsFromEvolvedTableId(evolvedTableId).stream()
-                .flatMap(
-                        upstreamTableId ->
-                                upstreamSchemaTable.row(upstreamTableId).values().stream())
-                .collect(Collectors.toSet());
-    }
-
     @VisibleForTesting
     public void emplaceUpstreamSchema(
             @Nonnull TableId tableId, int sourcePartition, @Nonnull Schema schema) {
@@ -698,6 +670,6 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
 
     @VisibleForTesting
     public void emplaceEvolvedSchema(@Nonnull TableId tableId, @Nonnull Schema schema) {
-        schemaManager.emplaceEvolvedSchema(tableId, schema);
+        schemaManager.emplaceSchema(tableId, schema);
     }
 }
