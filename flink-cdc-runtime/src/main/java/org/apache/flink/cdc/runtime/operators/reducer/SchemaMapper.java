@@ -29,7 +29,6 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.utils.SchemaReducingUtils;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
-import org.apache.flink.cdc.runtime.operators.reducer.events.BlockUpstreamRequest;
 import org.apache.flink.cdc.runtime.operators.reducer.events.CoordinationResponseUtils;
 import org.apache.flink.cdc.runtime.operators.reducer.events.ReduceSchemaRequest;
 import org.apache.flink.cdc.runtime.operators.reducer.events.ReduceSchemaResponse;
@@ -169,24 +168,7 @@ public class SchemaMapper extends AbstractStreamOperator<Event>
 
     @Override
     public void handleOperatorEvent(OperatorEvent event) {
-        if (event instanceof BlockUpstreamRequest) {
-            LOG.info("{}> Received emit flush event request {}.", subTaskId, event);
-            BlockUpstreamRequest blockUpstreamRequest = (BlockUpstreamRequest) event;
-
-            if (blockUpstreamRequest.getReduceSeqNum() < schemaMapperSeqNum) {
-                LOG.info(
-                        "{}> Stale block upstream request, it might have been requested in processElement. Drop it.",
-                        subTaskId);
-                return;
-            }
-
-            // Request a dummy schema change request (though no schema change events are received
-            // from upstream) to align all schema mappers by ensuring they are all blocked and sent
-            // flush events.
-            requestSchemaReduce(ReduceSchemaRequest.createAlignRequest(subTaskId));
-        } else {
-            throw new IllegalArgumentException("Unexpected operator event: " + event);
-        }
+        throw new IllegalArgumentException("Unexpected operator event: " + event);
     }
 
     private void requestSchemaReduce(ReduceSchemaRequest reduceSchemaRequest) {

@@ -33,7 +33,7 @@ public class ReduceSchemaRequest implements CoordinationRequest {
     // A schema change event is uniquely bound to a sourceSubTaskId.
     private final SchemaChangeEvent schemaChangeEvent;
 
-    public static ReduceSchemaRequest createAlignRequest(int sinkSubTaskId) {
+    public static ReduceSchemaRequest createNoOpRequest(int sinkSubTaskId) {
         return new ReduceSchemaRequest(-1, sinkSubTaskId, null);
     }
 
@@ -44,16 +44,15 @@ public class ReduceSchemaRequest implements CoordinationRequest {
         this.schemaChangeEvent = schemaChangeEvent;
     }
 
-    // Checking if this schema request was triggered by a "blockUpstreamRequest" for mapper
-    // alignment purposes, instead of an actual incompatible schema. We don't need to infer schema
-    // for those requests.
-    public boolean isAlignRequest() {
+    // Checking if this schema request was invalidated since it has been submitted by another
+    // downstream sink subTask before.
+    public boolean isNoOpRequest() {
         return sourceSubTaskId == -1 || schemaChangeEvent == null;
     }
 
     public int getSourceSubTaskId() {
         Preconditions.checkState(
-                !isAlignRequest(), "Unable to fetch source subTaskId for an align event.");
+                !isNoOpRequest(), "Unable to fetch source subTaskId for an align event.");
         return sourceSubTaskId;
     }
 
@@ -63,13 +62,13 @@ public class ReduceSchemaRequest implements CoordinationRequest {
 
     public SchemaChangeEvent getSchemaChangeEvent() {
         Preconditions.checkState(
-                !isAlignRequest(), "Unable to fetch source subTaskId for an align event.");
+                !isNoOpRequest(), "Unable to fetch source subTaskId for an align event.");
         return schemaChangeEvent;
     }
 
     @Override
     public String toString() {
-        return isAlignRequest()
+        return isNoOpRequest()
                 ? "ReduceSchemaRequest{sinkSubTaskId=" + sinkSubTaskId + ", align=true}"
                 : "ReduceSchemaRequest{"
                         + "sourceSubTaskId="

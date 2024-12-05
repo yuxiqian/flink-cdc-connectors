@@ -30,7 +30,6 @@ import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.SchemaReducingUtils;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
-import org.apache.flink.cdc.runtime.operators.reducer.events.BlockUpstreamRequest;
 import org.apache.flink.cdc.runtime.operators.reducer.events.FlushSuccessEvent;
 import org.apache.flink.cdc.runtime.operators.reducer.events.GetEvolvedSchemaRequest;
 import org.apache.flink.cdc.runtime.operators.reducer.events.GetEvolvedSchemaResponse;
@@ -230,7 +229,7 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
     private void handleReduceSchemaRequest(
             ReduceSchemaRequest request, CompletableFuture<CoordinationResponse> responseFuture) {
         LOG.info("Reducer received schema reduce request {}.", request);
-        if (!request.isAlignRequest()) {
+        if (!request.isNoOpRequest()) {
             LOG.info("It's not an align request, will try to deduplicate.");
             int eventSourcePartitionId = request.getSourceSubTaskId();
             int handlingSinkSubTaskId = request.getSinkSubTaskId();
@@ -255,7 +254,7 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
                         "It's an already handled event {}. It has been handled by {}",
                         uniqueKey,
                         reportedSinkSubTasks);
-                request = ReduceSchemaRequest.createAlignRequest(handlingSinkSubTaskId);
+                request = ReduceSchemaRequest.createNoOpRequest(handlingSinkSubTaskId);
             }
             // Moreover, if we've collected all sink subTasks' request, remove it from memory since
             // no more will be possible.
@@ -272,21 +271,22 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
 
         if (pendingRequests.size() == 1) {
             Preconditions.checkState(
-                    reducerStatus.compareAndSet(RequestStatus.IDLE, RequestStatus.BROADCASTING),
+                    reducerStatus.compareAndSet(
+                            RequestStatus.IDLE, RequestStatus.WAITING_FOR_FLUSH),
                     "Unexpected reducer status: " + reducerStatus.get());
             LOG.info(
-                    "Received the very-first schema reduce request {}. Switching from IDLE to BROADCASTING.",
+                    "Received the very-first schema reduce request {}. Switching from IDLE to WAITING_FOR_FLUSH.",
                     request);
-            broadcastBlockUpstreamRequest();
         }
 
         // No else if, since currentParallelism might be == 1
         if (pendingRequests.size() == currentParallelism) {
             Preconditions.checkState(
-                    reducerStatus.compareAndSet(RequestStatus.BROADCASTING, RequestStatus.EVOLVING),
+                    reducerStatus.compareAndSet(
+                            RequestStatus.WAITING_FOR_FLUSH, RequestStatus.EVOLVING),
                     "Unexpected reducer status: " + reducerStatus.get());
             LOG.info(
-                    "Received the last required schema reduce request {}. Switching from BROADCASTING to EVOLVING.",
+                    "Received the last required schema reduce request {}. Switching from WAITING_FOR_FLUSH to EVOLVING.",
                     request);
             startSchemaChangesReduce();
         }
@@ -354,7 +354,7 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
                         .map(e -> e.f0)
                         .filter(
                                 request ->
-                                        !request.isAlignRequest()) // Ignore alignment only requests
+                                        !request.isNoOpRequest()) // Ignore alignment only requests
                         .collect(Collectors.toList());
 
         // Preparation: Group original schema change events by upstream table ID, in case if we need
@@ -475,24 +475,6 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
                 throw t;
             }
         }
-    }
-
-    private void broadcastBlockUpstreamRequest() {
-        // We must wait for all subTasks being successfully registered before broadcasting anything.
-        loopWhen(
-                () -> subtaskGatewayMap.size() < currentParallelism,
-                () ->
-                        LOG.info(
-                                "Not all subTasks have been registered. Expected {}, actual {}",
-                                currentParallelism,
-                                subtaskGatewayMap.keySet()));
-        subtaskGatewayMap.forEach(
-                (subTaskId, gateway) -> {
-                    if (!pendingRequests.containsKey(subTaskId)) {
-                        LOG.info("Try to broadcast BlockUpstreamRequest to {}", subTaskId);
-                        gateway.sendEvent(new BlockUpstreamRequest(schemaMapperSeqNum.get()));
-                    }
-                });
     }
 
     // -------------------------
@@ -632,13 +614,13 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
 
     /**
      * {@code IDLE}: Initial idling state, ready for requests. <br>
-     * {@code BROADCASTING}: Trying to block all mappers before they blocked upstream & collect
-     * FlushEvents. <br>
+     * {@code WAITING_FOR_FLUSH}: Waiting for all mappers to block & collecting enough FlushEvents.
+     * <br>
      * {@code EVOLVING}: Applying schema change to sink.
      */
     private enum RequestStatus {
         IDLE,
-        BROADCASTING,
+        WAITING_FOR_FLUSH,
         EVOLVING
     }
 
