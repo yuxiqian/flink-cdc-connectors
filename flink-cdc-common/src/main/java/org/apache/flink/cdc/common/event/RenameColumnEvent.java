@@ -46,7 +46,10 @@ public class RenameColumnEvent implements SchemaChangeEvent {
         return new RenameColumnEvent(newTableId, nameMapping);
     }
 
-    /** Returns the name mapping. */
+    /**
+     * Returns the name mapping. Key => column name before changing, value => column name after
+     * changing.
+     */
     public Map<String, String> getNameMapping() {
         return nameMapping;
     }

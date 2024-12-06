@@ -36,8 +36,6 @@ import org.apache.flink.cdc.runtime.operators.reducer.events.GetEvolvedSchemaRes
 import org.apache.flink.cdc.runtime.operators.reducer.events.ReduceSchemaRequest;
 import org.apache.flink.cdc.runtime.operators.reducer.events.ReduceSchemaResponse;
 import org.apache.flink.cdc.runtime.operators.reducer.events.SinkWriterRegisterEvent;
-import org.apache.flink.cdc.runtime.operators.reducer.utils.SchemaNormalizer;
-import org.apache.flink.cdc.runtime.operators.reducer.utils.TableIdRouter;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequestHandler;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
@@ -405,7 +403,7 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
 
                 // Notice that even we're using schema isolation-guaranteed sources, identical
                 // CreateTableEvent might be emitted from all source subTasks before starting
-                // snapshot phase. This is tolerable and we don't need to handle it multiple times.
+                // snapshot phase. This is tolerable, and we don't need to apply it multiple times.
                 for (SchemaChangeEvent schemaChangeEvent :
                         schemaChangesGroupedByUpstreamTableIds.get(upstreamDependencyTable)) {
                     if (schemaChangeEvent instanceof CreateTableEvent
@@ -443,7 +441,7 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
             // change behavior configuration, dropping explicitly excluded schema change event
             // types.
             evolvedSchemaChanges.addAll(
-                    SchemaNormalizer.normalizeSchemaChangeEvents(
+                    SchemaDerivator.normalizeSchemaChangeEvents(
                             currentSinkSchema,
                             localEvolvedSchemaChanges,
                             schemaChangeBehavior,

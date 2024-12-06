@@ -32,7 +32,6 @@ import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.operators.reducer.events.CoordinationResponseUtils;
 import org.apache.flink.cdc.runtime.operators.reducer.events.ReduceSchemaRequest;
 import org.apache.flink.cdc.runtime.operators.reducer.events.ReduceSchemaResponse;
-import org.apache.flink.cdc.runtime.operators.reducer.utils.TableIdRouter;
 import org.apache.flink.cdc.runtime.partitioning.PartitioningEvent;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;

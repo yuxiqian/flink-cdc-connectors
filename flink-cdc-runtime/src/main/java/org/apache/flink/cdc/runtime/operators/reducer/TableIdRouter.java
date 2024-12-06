@@ -15,38 +15,43 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.runtime.operators.reducer.utils;
+package org.apache.flink.cdc.runtime.operators.reducer;
 
 import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.schema.Selectors;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.PatternSyntaxException;
 import java.util.stream.Collectors;
 
 /**
- * Simply routes upstream data change events to correct downstream tables (could be multiple). In
- * inference mode we don't need to worry about routing schema merging stuff. Just deliver it.
+ * Calculates how upstream data change events should be dispatched to downstream tables. Returns one
+ * or many destination Table IDs based on provided routing rules.
  */
 public class TableIdRouter {
 
     private final List<Tuple3<Selectors, String, String>> routes;
 
     public TableIdRouter(List<RouteRule> routingRules) {
-        this.routes =
-                routingRules.stream()
-                        .map(
-                                rule -> {
-                                    String tableInclusions = rule.sourceTable;
-                                    Selectors selectors =
-                                            new Selectors.SelectorsBuilder()
-                                                    .includeTables(tableInclusions)
-                                                    .build();
-                                    return new Tuple3<>(
-                                            selectors, rule.sinkTable, rule.replaceSymbol);
-                                })
-                        .collect(Collectors.toList());
+        this.routes = new ArrayList<>();
+        for (RouteRule rule : routingRules) {
+            try {
+                String tableInclusions = rule.sourceTable;
+                Selectors selectors =
+                        new Selectors.SelectorsBuilder().includeTables(tableInclusions).build();
+                routes.add(new Tuple3<>(selectors, rule.sinkTable, rule.replaceSymbol));
+            } catch (PatternSyntaxException e) {
+                throw new IllegalArgumentException(
+                        String.format(
+                                "Failed to parse regular expression in routing rule %s. Notice that `.` is used to separate Table ID components. To use it as a regex token, put a `\\` before to escape it.",
+                                rule),
+                        e);
+            }
+        }
     }
 
     public List<TableId> route(TableId sourceTableId) {
@@ -59,6 +64,11 @@ public class TableIdRouter {
             routedTableIds.add(sourceTableId);
         }
         return routedTableIds;
+    }
+
+    @VisibleForTesting
+    List<Tuple3<Selectors, String, String>> getRoutes() {
+        return routes;
     }
 
     private TableId resolveReplacement(
