@@ -27,7 +27,6 @@ import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
-import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
@@ -49,39 +48,7 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
 
 /** Unit test for {@link SchemaDerivator}. */
-public class SchemaDerivatorTest {
-
-    private static final List<RouteRule> ROUTING_RULES =
-            Arrays.asList(
-                    // Simple 1-to-1 routing rules
-                    new RouteRule("db_1.table_1", "db_1.table_1"),
-                    new RouteRule("db_1.table_2", "db_1.table_2"),
-                    new RouteRule("db_1.table_3", "db_1.table_3"),
-
-                    // Re-routed rules
-                    new RouteRule("db_2.table_1", "db_2.table_2"),
-                    new RouteRule("db_2.table_2", "db_2.table_3"),
-                    new RouteRule("db_2.table_3", "db_2.table_1"),
-
-                    // Merging tables
-                    new RouteRule("db_3.table_\\.*", "db_3.table_merged"),
-
-                    // Broadcast tables
-                    new RouteRule("db_4.table_1", "db_4.table_a"),
-                    new RouteRule("db_4.table_1", "db_4.table_b"),
-                    new RouteRule("db_4.table_1", "db_4.table_c"),
-                    new RouteRule("db_4.table_2", "db_4.table_b"),
-                    new RouteRule("db_4.table_2", "db_4.table_c"),
-                    new RouteRule("db_4.table_3", "db_4.table_c"),
-
-                    // RepSym routes
-                    new RouteRule("db_5.table_\\.*", "db_5.prefix_<>_suffix", "<>"),
-
-                    // Irrelevant routes
-                    new RouteRule("foo", "bar", null));
-
-    private static final TableIdRouter TABLE_ID_ROUTER = new TableIdRouter(ROUTING_RULES);
-
+public class SchemaDerivatorTest extends ReducerTestBase {
     private static final Set<TableId> ALL_UPSTREAM_TABLE_IDS =
             IntStream.rangeClosed(0, 5)
                     .boxed()

@@ -48,7 +48,10 @@ class PartitioningEventSerializerTest extends SerializerTestBase<PartitioningEve
 
     @Override
     protected PartitioningEvent[] getTestData() {
-        Event[] flushEvents = new Event[] {new FlushEvent(), new FlushEvent(), new FlushEvent()};
+        Event[] flushEvents =
+                new Event[] {
+                    FlushEvent.getInstance(), FlushEvent.getInstance(), FlushEvent.getInstance()
+                };
         Event[] dataChangeEvents = new DataChangeEventSerializerTest().getTestData();
         Event[] schemaChangeEvents = new SchemaChangeEventSerializerTest().getTestData();
 

@@ -176,20 +176,14 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
         CompletableFuture<CoordinationResponse> responseFuture = new CompletableFuture<>();
         runInEventLoop(
                 () -> {
-                    try {
-                        if (request instanceof GetEvolvedSchemaRequest) {
-                            handleGetReducedSchemaRequest(
-                                    ((GetEvolvedSchemaRequest) request), responseFuture);
-                        } else if (request instanceof ReduceSchemaRequest) {
-                            handleReduceSchemaRequest(
-                                    (ReduceSchemaRequest) request, responseFuture);
-                        } else {
-                            throw new IllegalArgumentException(
-                                    "Unrecognized CoordinationRequest type: " + request);
-                        }
-                    } catch (Throwable t) {
-                        context.failJob(t);
-                        throw t;
+                    if (request instanceof GetEvolvedSchemaRequest) {
+                        handleGetReducedSchemaRequest(
+                                ((GetEvolvedSchemaRequest) request), responseFuture);
+                    } else if (request instanceof ReduceSchemaRequest) {
+                        handleReduceSchemaRequest((ReduceSchemaRequest) request, responseFuture);
+                    } else {
+                        throw new IllegalArgumentException(
+                                "Unrecognized CoordinationRequest type: " + request);
                     }
                 },
                 "handling coordination request %s",
@@ -201,18 +195,12 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
     public void handleEventFromOperator(int subTaskId, int attemptNumber, OperatorEvent event) {
         runInEventLoop(
                 () -> {
-                    try {
-                        if (event instanceof FlushSuccessEvent) {
-                            handleFlushSuccessEvent((FlushSuccessEvent) event);
-                        } else if (event instanceof SinkWriterRegisterEvent) {
-                            activeSinkWriters.add(((SinkWriterRegisterEvent) event).getSubtask());
-                        } else {
-                            throw new FlinkRuntimeException(
-                                    "Unrecognized Operator Event: " + event);
-                        }
-                    } catch (Throwable t) {
-                        context.failJob(t);
-                        throw t;
+                    if (event instanceof FlushSuccessEvent) {
+                        handleFlushSuccessEvent((FlushSuccessEvent) event);
+                    } else if (event instanceof SinkWriterRegisterEvent) {
+                        activeSinkWriters.add(((SinkWriterRegisterEvent) event).getSubtask());
+                    } else {
+                        throw new FlinkRuntimeException("Unrecognized Operator Event: " + event);
                     }
                 },
                 "handling event %s from subTask %d",
@@ -455,6 +443,9 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
         try {
             metadataApplier.applySchemaChange(schemaChangeEvent);
             schemaManager.applySchemaChange(schemaChangeEvent);
+            LOG.info(
+                    "Successfully applied schema change event {} to external system.",
+                    schemaChangeEvent);
             return true;
         } catch (Throwable t) {
             if (shouldIgnoreException(t)) {
@@ -464,13 +455,11 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
                         t);
                 return false;
             } else {
-                context.failJob(
-                        new FlinkRuntimeException(
-                                "Failed to apply schema change event "
-                                        + schemaChangeEvent
-                                        + ". Caused by: ",
-                                t));
-                throw t;
+                throw new FlinkRuntimeException(
+                        "Failed to apply schema change event "
+                                + schemaChangeEvent
+                                + ". Caused by: ",
+                        t);
             }
         }
     }
@@ -530,6 +519,9 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
                                 operatorName,
                                 actionString,
                                 t);
+
+                        // For all still-waiting schema mappers, complete it exceptionally
+                        pendingRequests.forEach((k, v) -> v.f1.completeExceptionally(t));
                         context.failJob(t);
                     }
                 });
@@ -571,9 +563,6 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
                         out.writeInt(serializedSchemaManager.length);
                         out.write(serializedSchemaManager);
                         resultFuture.complete(baos.toByteArray());
-                    } catch (Throwable t) {
-                        context.failJob(t);
-                        throw t;
                     }
                 },
                 "taking checkpoint %d",
@@ -600,9 +589,6 @@ public class SchemaReducer implements OperatorCoordinator, CoordinationRequestHa
             schemaManager =
                     SchemaManager.SERIALIZER.deserialize(
                             schemaManagerSerializerVersion, serializedSchemaManager);
-        } catch (Throwable t) {
-            context.failJob(t);
-            throw t;
         }
     }
 

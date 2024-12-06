@@ -81,19 +81,20 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
     private final MockedOperatorCoordinatorContext mockedContext;
 
     public EventOperatorTestHarness(OP operator, int numOutputs) {
-        this(operator, numOutputs, null);
+        this(operator, numOutputs, SchemaChangeBehavior.EVOLVE);
     }
 
-    public EventOperatorTestHarness(OP operator, int numOutputs, Duration duration) {
-        this(operator, numOutputs, duration, SchemaChangeBehavior.EVOLVE);
+    public EventOperatorTestHarness(
+            OP operator, int numOutputs, SchemaChangeBehavior schemaChangeBehavior) {
+        this(operator, numOutputs, schemaChangeBehavior, null);
     }
 
     public EventOperatorTestHarness(
             OP operator,
             int numOutputs,
-            Duration duration,
-            SchemaChangeBehavior schemaChangeBehavior) {
-        this(operator, numOutputs, duration, SchemaChangeBehavior.EVOLVE, true);
+            SchemaChangeBehavior schemaChangeBehavior,
+            Duration duration) {
+        this(operator, numOutputs, duration, schemaChangeBehavior, true);
     }
 
     public EventOperatorTestHarness(

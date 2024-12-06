@@ -172,7 +172,7 @@ public class SchemaMapper extends AbstractStreamOperator<Event>
 
     private void requestSchemaReduce(ReduceSchemaRequest reduceSchemaRequest) {
         LOG.info("{}> Sent FlushEvent to downstream...", subTaskId);
-        output.collect(new StreamRecord<>(new FlushEvent()));
+        output.collect(new StreamRecord<>(FlushEvent.getInstance()));
 
         LOG.info("{}> Sending reduce request...", subTaskId);
         ReduceSchemaResponse response = sendRequestToCoordinator(reduceSchemaRequest);

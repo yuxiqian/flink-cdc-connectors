@@ -19,14 +19,28 @@ package org.apache.flink.cdc.common.event;
 
 /**
  * An {@link Event} from {@code SchemaOperator} to notify {@code DataSinkWriterOperator} that it
- * start flushing.
+ * start flushing. It is a singleton class that carries no extra information at all.
  */
 public class FlushEvent implements Event {
+    private static final FlushEvent INSTANCE = new FlushEvent();
+
+    // Direct instantiation is not allowed.
+    protected FlushEvent() {}
+
+    public static FlushEvent getInstance() {
+        return INSTANCE;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
         }
         return o instanceof FlushEvent;
+    }
+
+    @Override
+    public String toString() {
+        return "FlushEvent{}";
     }
 }

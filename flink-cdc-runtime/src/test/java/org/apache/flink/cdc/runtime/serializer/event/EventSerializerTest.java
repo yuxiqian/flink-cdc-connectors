@@ -44,7 +44,10 @@ public class EventSerializerTest extends SerializerTestBase<Event> {
 
     @Override
     protected Event[] getTestData() {
-        Event[] flushEvents = new Event[] {new FlushEvent(), new FlushEvent(), new FlushEvent()};
+        Event[] flushEvents =
+                new Event[] {
+                    FlushEvent.getInstance(), FlushEvent.getInstance(), FlushEvent.getInstance()
+                };
         Event[] dataChangeEvents = new DataChangeEventSerializerTest().getTestData();
         Event[] schemaChangeEvents = new SchemaChangeEventSerializerTest().getTestData();
         return Stream.concat(
