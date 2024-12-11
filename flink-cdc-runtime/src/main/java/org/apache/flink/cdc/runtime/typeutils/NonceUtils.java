@@ -46,7 +46,7 @@ public class NonceUtils {
     /** Generating a {@link FlushEvent} carrying a nonce. */
     public static FlushEvent generateFlushEvent(
             int timestamp, int subTaskId, TableId tableId, Event schemaChangeEvent) {
-        return new FlushEvent(
+        return FlushEvent.of(
                 tableId, generateNonce(timestamp, subTaskId, tableId, schemaChangeEvent));
     }
 }

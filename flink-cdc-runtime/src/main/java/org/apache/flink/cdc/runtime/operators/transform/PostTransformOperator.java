@@ -32,6 +32,7 @@ import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.udf.UserDefinedFunctionContext;
+import org.apache.flink.cdc.common.utils.SchemaMergingUtils;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.parser.TransformParser;
 import org.apache.flink.streaming.api.graph.StreamConfig;
@@ -358,7 +359,7 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
             return schema;
         }
 
-        return SchemaUtils.inferWiderSchema(newSchemas);
+        return SchemaMergingUtils.getCommonSchema(newSchemas);
     }
 
     private List<Object> getUdfFunctionInstances() {

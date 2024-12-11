@@ -17,6 +17,9 @@
 
 package org.apache.flink.cdc.common.event;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 import java.util.Objects;
 
 /**
@@ -25,21 +28,35 @@ import java.util.Objects;
  */
 public class FlushEvent implements Event {
 
-    /** The schema changes from which table. */
-    private final TableId tableId;
+    /**
+     * The schema changes from which table. If tableId is null, it means this {@code FlushEvent}
+     * should flush all pending events, no matter which table it belongs to.
+     */
+    private final @Nullable TableId tableId;
 
     /**
-     * Nonce code to distinguish flush events corresponding to each schema change event from
-     * different subTasks.
+     * With the Schema Operator - Registry topology, a nonce code is required to distinguish flush
+     * events corresponding to each schema change event from different subTasks.
      */
     private final long nonce;
 
-    public FlushEvent(TableId tableId, long nonce) {
+    /** With the distributed topology, we don't need to track flush events for various tables. */
+    private static final FlushEvent FLUSH_ALL_EVENT = new FlushEvent(null, -1L);
+
+    protected FlushEvent(@Nullable TableId tableId, long nonce) {
         this.tableId = tableId;
         this.nonce = nonce;
     }
 
-    public TableId getTableId() {
+    public static FlushEvent ofAll() {
+        return FLUSH_ALL_EVENT;
+    }
+
+    public static FlushEvent of(@Nonnull TableId tableId, long nonce) {
+        return new FlushEvent(tableId, nonce);
+    }
+
+    public @Nullable TableId getTableId() {
         return tableId;
     }
 
@@ -66,6 +83,10 @@ public class FlushEvent implements Event {
 
     @Override
     public String toString() {
-        return "FlushEvent{" + "tableId=" + tableId + ", nonce=" + nonce + '}';
+        if (tableId == null) {
+            return "FlushEvent{ << not table-specific >> }";
+        } else {
+            return "FlushEvent{" + "tableId=" + tableId + ", nonce=" + nonce + '}';
+        }
     }
 }

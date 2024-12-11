@@ -68,7 +68,18 @@ public abstract class PipelineTestEnvironment extends TestLogger {
 
     @Parameterized.Parameter public String flinkVersion;
 
-    public Integer parallelism = 4;
+    public Integer parallelism = getParallelism();
+
+    private int getParallelism() {
+        try {
+            return Integer.parseInt(System.getProperty("specifiedParallelism"));
+        } catch (NumberFormatException ex) {
+            LOG.warn(
+                    "Unable to parse specified parallelism configuration ({} provided). Use 4 by default.",
+                    System.getProperty("specifiedParallelism"));
+            return 4;
+        }
+    }
 
     // ------------------------------------------------------------------------------------------
     // Flink Variables
@@ -230,6 +241,8 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                 JobStatusMessage message = jobStatusMessages.iterator().next();
                 JobStatus jobStatus = message.getJobState();
                 if (jobStatus.isTerminalState()) {
+                    System.err.println("JM Log: ");
+                    System.err.println(jobManagerConsumer.toUtf8String());
                     throw new ValidationException(
                             String.format(
                                     "Job has been terminated! JobName: %s, JobID: %s, Status: %s",

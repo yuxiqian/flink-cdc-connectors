@@ -51,9 +51,9 @@ class PartitioningEventSerializerTest extends SerializerTestBase<PartitioningEve
     protected PartitioningEvent[] getTestData() {
         Event[] flushEvents =
                 new Event[] {
-                    new FlushEvent(TableId.tableId("table"), 1L),
-                    new FlushEvent(TableId.tableId("schema", "table"), 2L),
-                    new FlushEvent(TableId.tableId("namespace", "schema", "table"), 3L)
+                    FlushEvent.of(TableId.tableId("table"), 1L),
+                    FlushEvent.of(TableId.tableId("schema", "table"), 2L),
+                    FlushEvent.of(TableId.tableId("namespace", "schema", "table"), 3L)
                 };
         Event[] dataChangeEvents = new DataChangeEventSerializerTest().getTestData();
         Event[] schemaChangeEvents = new SchemaChangeEventSerializerTest().getTestData();
@@ -62,15 +62,15 @@ class PartitioningEventSerializerTest extends SerializerTestBase<PartitioningEve
 
         partitioningEvents.addAll(
                 Arrays.stream(flushEvents)
-                        .map(event -> new PartitioningEvent(event, 1))
+                        .map(event -> PartitioningEvent.ofRegular(event, 1))
                         .collect(Collectors.toList()));
         partitioningEvents.addAll(
                 Arrays.stream(dataChangeEvents)
-                        .map(event -> new PartitioningEvent(event, 2))
+                        .map(event -> PartitioningEvent.ofRegular(event, 2))
                         .collect(Collectors.toList()));
         partitioningEvents.addAll(
                 Arrays.stream(schemaChangeEvents)
-                        .map(event -> new PartitioningEvent(event, 3))
+                        .map(event -> PartitioningEvent.ofRegular(event, 3))
                         .collect(Collectors.toList()));
 
         return partitioningEvents.toArray(new PartitioningEvent[0]);
