@@ -25,8 +25,11 @@ import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
+import org.apache.flink.cdc.common.event.FlushSchemaEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.utils.SchemaMergingUtils;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
@@ -45,9 +48,9 @@ import org.apache.flink.streaming.runtime.watermarkstatus.WatermarkStatus;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
-import java.util.HashSet;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 
 /**
  * An operator that processes records to be written into a {@link
@@ -82,8 +85,8 @@ public class DataSinkWriterOperator<CommT> extends AbstractStreamOperator<Commit
      */
     private SinkWriter<Event> copySinkWriter;
 
-    /** A set of {@link TableId} that already processed {@link CreateTableEvent}. */
-    private final Set<TableId> processedTableIds;
+    /** A map of {@link TableId} and current schema view. */
+    private final Map<TableId, Schema> localSchemaCacheView;
 
     public DataSinkWriterOperator(
             Sink<Event> sink,
@@ -94,7 +97,7 @@ public class DataSinkWriterOperator<CommT> extends AbstractStreamOperator<Commit
         this.processingTimeService = processingTimeService;
         this.mailboxExecutor = mailboxExecutor;
         this.schemaOperatorID = schemaOperatorID;
-        this.processedTableIds = new HashSet<>();
+        this.localSchemaCacheView = new HashMap<>();
         this.chainingStrategy = ChainingStrategy.ALWAYS;
     }
 
@@ -156,9 +159,19 @@ public class DataSinkWriterOperator<CommT> extends AbstractStreamOperator<Commit
             return;
         }
 
+        // Retrieve latest evolved schema, reconstruct schema change events and send it to sink.
+        if (event instanceof FlushSchemaEvent) {
+            FlushSchemaEvent flushSchemaEvent = (FlushSchemaEvent) event;
+            for (TableId tableId : flushSchemaEvent.getChangedTables()) {
+                refreshSchemaFor(tableId);
+            }
+            return;
+        }
+
         // CreateTableEvent marks the table as processed directly
         if (event instanceof CreateTableEvent) {
-            processedTableIds.add(((CreateTableEvent) event).tableId());
+            CreateTableEvent createTableEvent = (CreateTableEvent) event;
+            localSchemaCacheView.put(createTableEvent.tableId(), createTableEvent.getSchema());
             this.<OneInputStreamOperator<Event, CommittableMessage<CommT>>>getFlinkWriterOperator()
                     .processElement(element);
             return;
@@ -168,11 +181,9 @@ public class DataSinkWriterOperator<CommT> extends AbstractStreamOperator<Commit
         // sure that sink have a view of the full schema before processing any change events,
         // including schema changes.
         ChangeEvent changeEvent = (ChangeEvent) event;
-        if (!processedTableIds.contains(changeEvent.tableId())) {
-            emitLatestSchema(changeEvent.tableId());
-            processedTableIds.add(changeEvent.tableId());
+        if (!localSchemaCacheView.containsKey(changeEvent.tableId())) {
+            refreshSchemaFor(changeEvent.tableId());
         }
-        processedTableIds.add(changeEvent.tableId());
         this.<OneInputStreamOperator<Event, CommittableMessage<CommT>>>getFlinkWriterOperator()
                 .processElement(element);
     }
@@ -202,15 +213,20 @@ public class DataSinkWriterOperator<CommT> extends AbstractStreamOperator<Commit
                 getRuntimeContext().getIndexOfThisSubtask(), event.getTableId(), event.getNonce());
     }
 
-    private void emitLatestSchema(TableId tableId) throws Exception {
+    private void refreshSchemaFor(TableId tableId) throws Exception {
+        Schema oldSchema = localSchemaCacheView.get(tableId);
         Optional<Schema> schema = schemaEvolutionClient.getLatestEvolvedSchema(tableId);
         if (schema.isPresent()) {
             // request and process CreateTableEvent because SinkWriter need to retrieve
             // Schema to deserialize RecordData after resuming job.
-            this.<OneInputStreamOperator<Event, CommittableMessage<CommT>>>getFlinkWriterOperator()
-                    .processElement(
-                            new StreamRecord<>(new CreateTableEvent(tableId, schema.get())));
-            processedTableIds.add(tableId);
+            for (SchemaChangeEvent event :
+                    SchemaMergingUtils.getSchemaDifference(tableId, oldSchema, schema.get())) {
+                this
+                        .<OneInputStreamOperator<Event, CommittableMessage<CommT>>>
+                                getFlinkWriterOperator()
+                        .processElement(new StreamRecord<>(event));
+            }
+            localSchemaCacheView.put(tableId, schema.get());
         } else {
             throw new RuntimeException(
                     "Could not find schema message from SchemaRegistry for " + tableId);

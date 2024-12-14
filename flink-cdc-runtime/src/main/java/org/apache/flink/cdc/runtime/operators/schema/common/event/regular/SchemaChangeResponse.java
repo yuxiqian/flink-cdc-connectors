@@ -17,7 +17,7 @@
 
 package org.apache.flink.cdc.runtime.operators.schema.common.event.regular;
 
-import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.runtime.operators.schema.regular.SchemaCoordinator;
@@ -40,27 +40,19 @@ public class SchemaChangeResponse implements CoordinationResponse {
      * Actually finished schema change events. This will only be effective if status is {@code
      * accepted}.
      */
-    private final List<SchemaChangeEvent> appliedSchemaChangeEvents;
+    private final List<Event> appliedSchemaChangeEvents;
 
     private final Map<TableId, Schema> evolvedSchemas;
 
     private final ResponseCode responseCode;
 
     public static SchemaChangeResponse success(
-            List<SchemaChangeEvent> schemaChangeEvents, Map<TableId, Schema> evolvedSchemas) {
+            List<Event> schemaChangeEvents, Map<TableId, Schema> evolvedSchemas) {
         return new SchemaChangeResponse(ResponseCode.SUCCESS, schemaChangeEvents, evolvedSchemas);
     }
 
     public static SchemaChangeResponse busy() {
         return new SchemaChangeResponse(ResponseCode.BUSY);
-    }
-
-    public static SchemaChangeResponse duplicate() {
-        return new SchemaChangeResponse(ResponseCode.DUPLICATE);
-    }
-
-    public static SchemaChangeResponse ignored() {
-        return new SchemaChangeResponse(ResponseCode.IGNORED);
     }
 
     public static SchemaChangeResponse waitingForFlush() {
@@ -73,7 +65,7 @@ public class SchemaChangeResponse implements CoordinationResponse {
 
     private SchemaChangeResponse(
             ResponseCode responseCode,
-            List<SchemaChangeEvent> appliedSchemaChangeEvents,
+            List<Event> appliedSchemaChangeEvents,
             Map<TableId, Schema> evolvedSchemas) {
         this.responseCode = responseCode;
         this.appliedSchemaChangeEvents = appliedSchemaChangeEvents;
@@ -88,24 +80,16 @@ public class SchemaChangeResponse implements CoordinationResponse {
         return ResponseCode.BUSY.equals(responseCode);
     }
 
-    public boolean isDuplicate() {
-        return ResponseCode.DUPLICATE.equals(responseCode);
-    }
-
-    public boolean isIgnored() {
-        return ResponseCode.IGNORED.equals(responseCode);
-    }
-
     public boolean isWaitingForFlush() {
         return ResponseCode.WAITING_FOR_FLUSH.equals(responseCode);
     }
 
-    public List<SchemaChangeEvent> getAppliedSchemaChangeEvents() {
-        return appliedSchemaChangeEvents;
-    }
-
     public Map<TableId, Schema> getEvolvedSchemas() {
         return evolvedSchemas;
+    }
+
+    public List<Event> getAppliedEvents() {
+        return appliedSchemaChangeEvents;
     }
 
     @Override
@@ -117,20 +101,23 @@ public class SchemaChangeResponse implements CoordinationResponse {
             return false;
         }
         SchemaChangeResponse response = (SchemaChangeResponse) o;
-        return Objects.equals(appliedSchemaChangeEvents, response.appliedSchemaChangeEvents)
+        return Objects.equals(evolvedSchemas, response.evolvedSchemas)
+                && Objects.equals(appliedSchemaChangeEvents, response.appliedSchemaChangeEvents)
                 && responseCode == response.responseCode;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(appliedSchemaChangeEvents, responseCode);
+        return Objects.hash(evolvedSchemas, appliedSchemaChangeEvents, responseCode);
     }
 
     @Override
     public String toString() {
         return "SchemaChangeResponse{"
-                + "schemaChangeEvents="
+                + "appliedSchemaChangeEvents="
                 + appliedSchemaChangeEvents
+                + ", evolvedSchemas="
+                + evolvedSchemas
                 + ", responseCode="
                 + responseCode
                 + '}';
@@ -144,17 +131,12 @@ public class SchemaChangeResponse implements CoordinationResponse {
      *
      * <p>- Busy: Schema registry is currently busy processing another schema change request.
      *
-     * <p>- Duplicate: This schema change request has been submitted before, possibly by another
-     * paralleled subTask.
-     *
-     * <p>- Ignored: This schema change request has been assessed, but no actual evolution is
-     * required. Possibly caused by LENIENT mode or merging table strategies.
+     * <p>- Waiting for Flush: This schema change request has not collected enough flush success
+     * events and could not be safely applied yet.
      */
     public enum ResponseCode {
         SUCCESS,
         BUSY,
-        DUPLICATE,
-        IGNORED,
         WAITING_FOR_FLUSH
     }
 }

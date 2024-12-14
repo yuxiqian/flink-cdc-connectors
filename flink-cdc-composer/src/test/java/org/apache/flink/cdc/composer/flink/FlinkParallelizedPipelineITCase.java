@@ -41,7 +41,6 @@ import org.apache.flink.test.junit5.MiniClusterExtension;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -1714,8 +1713,6 @@ class FlinkParallelizedPipelineITCase {
 
     @ParameterizedTest
     @EnumSource
-    @Disabled(
-            "This just doesn't work. You can't merge two tables from different partition in regular topology. Screw it.")
     void testRegularTablesSourceMergedInMultipleParallelism(ValuesDataSink.SinkApi sinkApi)
             throws Exception {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();

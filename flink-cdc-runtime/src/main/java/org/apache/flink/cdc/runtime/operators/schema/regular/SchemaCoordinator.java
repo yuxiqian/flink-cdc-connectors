@@ -18,6 +18,8 @@
 package org.apache.flink.cdc.runtime.operators.schema.regular;
 
 import org.apache.flink.cdc.common.event.CreateTableEvent;
+import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.FlushSchemaEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
@@ -386,7 +388,7 @@ public class SchemaCoordinator extends SchemaRegistry {
         }
 
         Map<TableId, Schema> refreshedEvolvedSchemas = new HashMap<>();
-
+        Set<TableId> unforwardableTableIds = new HashSet<>();
         // We need to retrieve all possibly modified evolved schemas and refresh SchemaOperator's
         // local cache since it might have been altered by another SchemaOperator instance.
         // SchemaChangeEvents doesn't need to be emitted to downstream (since it might be broadcast
@@ -394,13 +396,34 @@ public class SchemaCoordinator extends SchemaRegistry {
         for (TableId tableId : router.route(originalEvent.tableId())) {
             refreshedEvolvedSchemas.put(
                     tableId, schemaManager.getLatestEvolvedSchema(tableId).orElse(null));
+            if (SchemaDerivator.reverseLookupDependingUpstreamTables(
+                                    router, tableId, schemaManager.getAllOriginalTables())
+                            .size()
+                    > 1) {
+                unforwardableTableIds.add(tableId);
+            }
         }
 
         // And returns all successfully applied schema change events to SchemaOperator.
+        // For regular one-by-one schema change, just emit actual changes to downstream.
+        // For table-merging routes, we must let downstream operators to retrieve latest schema from
+        // registry.
+        // Emitting SchemaChangeEvents directly is not feasible, since events from various Schema
+        // Operators might be mixed together after being partitioned, and could cause unpredictable
+        // schema change event applying sequence.
+        // By requiring downstream operators to retrieve latest evolved schema from centralized
+        // registry, we could ensure a globally consistent schema view for all operators.
+
+        List<Event> finalSchemaChanges =
+                appliedSchemaChangeEvents.stream()
+                        .filter(evt -> !unforwardableTableIds.contains(evt.tableId()))
+                        .collect(Collectors.toList());
+        if (!unforwardableTableIds.isEmpty()) {
+            finalSchemaChanges.add(new FlushSchemaEvent(unforwardableTableIds));
+        }
+
         pendingResponseFuture.complete(
-                wrap(
-                        SchemaChangeResponse.success(
-                                appliedSchemaChangeEvents, refreshedEvolvedSchemas)));
+                wrap(SchemaChangeResponse.success(finalSchemaChanges, refreshedEvolvedSchemas)));
         pendingResponseFuture = null;
 
         Preconditions.checkState(

@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.connectors.values.sink;
 
-import org.apache.flink.api.common.eventtime.Watermark;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
@@ -28,6 +27,7 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.connectors.values.ValuesDatabase;
+import org.apache.flink.streaming.api.functions.sink.RichSinkFunction;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 
 import java.util.HashMap;
@@ -35,7 +35,7 @@ import java.util.List;
 import java.util.Map;
 
 /** An e2e {@link SinkFunction} implementation that print all {@link DataChangeEvent} out. */
-public class ValuesDataSinkFunction implements SinkFunction<Event> {
+public class ValuesDataSinkFunction extends RichSinkFunction<Event> {
     private final boolean materializedInMemory;
 
     private final boolean print;
@@ -79,20 +79,14 @@ public class ValuesDataSinkFunction implements SinkFunction<Event> {
         }
 
         if (print) {
-            // print the detail message to console for verification.
-            System.out.println(
-                    ValuesDataSinkHelper.convertEventToStr(
-                            event, fieldGetterMaps.get(((ChangeEvent) event).tableId())));
+            try {
+                // print the detail message to console for verification.
+                System.out.println(
+                        ValuesDataSinkHelper.convertEventToStr(
+                                event, fieldGetterMaps.get(((ChangeEvent) event).tableId())));
+            } catch (Throwable t) {
+                System.err.println("No!!!");
+            }
         }
-    }
-
-    @Override
-    public void writeWatermark(Watermark watermark) throws Exception {
-        SinkFunction.super.writeWatermark(watermark);
-    }
-
-    @Override
-    public void finish() throws Exception {
-        SinkFunction.super.finish();
     }
 }

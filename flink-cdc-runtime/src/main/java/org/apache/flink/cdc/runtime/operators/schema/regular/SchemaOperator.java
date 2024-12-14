@@ -33,7 +33,6 @@ import org.apache.flink.cdc.runtime.operators.schema.common.TableIdRouter;
 import org.apache.flink.cdc.runtime.operators.schema.common.event.common.CoordinationResponseUtils;
 import org.apache.flink.cdc.runtime.operators.schema.common.event.regular.SchemaChangeRequest;
 import org.apache.flink.cdc.runtime.operators.schema.common.event.regular.SchemaChangeResponse;
-import org.apache.flink.cdc.runtime.operators.schema.common.metrics.SchemaOperatorMetrics;
 import org.apache.flink.cdc.runtime.typeutils.NonceUtils;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
@@ -83,7 +82,6 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     // Transient fields that are set during open()
     private transient int subTaskId;
     private transient TaskOperatorEventGateway toCoordinator;
-    private transient SchemaOperatorMetrics schemaOperatorMetrics;
     private transient volatile Map<TableId, Schema> originalSchemaMap;
     private transient volatile Map<TableId, Schema> evolvedSchemaMap;
     private transient TableIdRouter router;
@@ -130,9 +128,6 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     @Override
     public void open() throws Exception {
         super.open();
-        this.schemaOperatorMetrics =
-                new SchemaOperatorMetrics(
-                        getRuntimeContext().getMetricGroup(), schemaChangeBehavior);
         this.subTaskId = getRuntimeContext().getTaskInfo().getIndexOfThisSubtask();
         this.originalSchemaMap = new HashMap<>();
         this.evolvedSchemaMap = new HashMap<>();
@@ -145,6 +140,8 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     @Override
     public void processElement(StreamRecord<Event> streamRecord) throws Exception {
         Event event = streamRecord.getValue();
+        LOG.info("{}> Handling stream event {}", subTaskId, event);
+        LOG.info("{}> Currently known evolved schema: {}", subTaskId, evolvedSchemaMap);
         if (event instanceof SchemaChangeEvent) {
             handleSchemaChangeEvent((SchemaChangeEvent) event);
         } else if (event instanceof DataChangeEvent) {
@@ -160,7 +157,6 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         originalSchemaMap.compute(
                 tableId,
                 (tId, schema) -> SchemaUtils.applySchemaChangeEvent(schema, originalEvent));
-        schemaOperatorMetrics.increaseSchemaChangeEvents(1);
 
         // First, send FlushEvent or it might be blocked later
         long nonce =
@@ -171,44 +167,15 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         // Then, queue to request schema change to SchemaCoordinator.
         SchemaChangeResponse response = requestSchemaChange(tableId, originalEvent, nonce);
 
-        if (response.isSuccess()) {
-            LOG.info("{}> Successfully requested schema change.", subTaskId);
-            LOG.info(
-                    "{}> Finished schema change events: {}",
-                    subTaskId,
-                    response.getAppliedSchemaChangeEvents());
-            LOG.info("{}> Refreshed evolved schemas: {}", subTaskId, response.getEvolvedSchemas());
+        LOG.info("{}> Successfully requested schema change.", subTaskId);
+        LOG.info("{}> Refreshed evolved schemas: {}", subTaskId, response.getEvolvedSchemas());
 
-            // After this request got successfully applied to DBMS, we can...
-            List<SchemaChangeEvent> finishedSchemaChangeEvents =
-                    response.getAppliedSchemaChangeEvents();
+        // Update local evolved schema map's cache.
+        evolvedSchemaMap.putAll(response.getEvolvedSchemas());
 
-            // Update local evolved schema map's cache
-            evolvedSchemaMap.putAll(response.getEvolvedSchemas());
-
+        for (Event event : response.getAppliedEvents()) {
             // and emit the finished event to downstream
-            for (SchemaChangeEvent finishedEvent : finishedSchemaChangeEvents) {
-                output.collect(new StreamRecord<>(finishedEvent));
-            }
-
-            schemaOperatorMetrics.increaseFinishedSchemaChangeEvents(
-                    finishedSchemaChangeEvents.size());
-        } else if (response.isDuplicate()) {
-            LOG.info(
-                    "{}> Schema change event {} has been handled in another subTask already.",
-                    subTaskId,
-                    originalEvent);
-
-            schemaOperatorMetrics.increaseIgnoredSchemaChangeEvents(1);
-        } else if (response.isIgnored()) {
-            LOG.info(
-                    "{}> Schema change event {} has been ignored. No schema evolution needed.",
-                    subTaskId,
-                    originalEvent);
-
-            schemaOperatorMetrics.increaseIgnoredSchemaChangeEvents(1);
-        } else {
-            throw new IllegalStateException("Unexpected response status: " + response);
+            output.collect(new StreamRecord<>(event));
         }
     }
 

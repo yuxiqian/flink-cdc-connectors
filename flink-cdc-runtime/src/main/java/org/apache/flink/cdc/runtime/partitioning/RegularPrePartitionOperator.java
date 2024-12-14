@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
+import org.apache.flink.cdc.common.event.FlushSchemaEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.function.HashFunction;
@@ -85,10 +86,11 @@ public class RegularPrePartitionOperator extends AbstractStreamOperator<Partitio
     @Override
     public void processElement(StreamRecord<Event> element) throws Exception {
         Event event = element.getValue();
-        if (event instanceof SchemaChangeEvent) {
+        if (event instanceof FlushSchemaEvent) {
             // Update hash function
-            TableId tableId = ((SchemaChangeEvent) event).tableId();
-            cachedHashFunctions.put(tableId, recreateHashFunction(tableId));
+            for (TableId tableId : ((FlushSchemaEvent) event).getChangedTables()) {
+                cachedHashFunctions.put(tableId, recreateHashFunction(tableId));
+            }
             // Broadcast SchemaChangeEvent
             broadcastEvent(event);
         } else if (event instanceof FlushEvent) {
@@ -97,6 +99,11 @@ public class RegularPrePartitionOperator extends AbstractStreamOperator<Partitio
         } else if (event instanceof DataChangeEvent) {
             // Partition DataChangeEvent by table ID and primary keys
             partitionBy(((DataChangeEvent) event));
+        } else if (event instanceof SchemaChangeEvent) {
+            SchemaChangeEvent schemaChangeEvent = (SchemaChangeEvent) event;
+            TableId tableId = schemaChangeEvent.tableId();
+            cachedHashFunctions.put(tableId, recreateHashFunction(tableId));
+            broadcastEvent(event);
         }
     }
 

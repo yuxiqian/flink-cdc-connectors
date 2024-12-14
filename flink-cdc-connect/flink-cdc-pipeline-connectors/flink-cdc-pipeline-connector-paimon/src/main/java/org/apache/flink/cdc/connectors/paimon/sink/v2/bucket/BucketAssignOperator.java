@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
+import org.apache.flink.cdc.common.event.FlushSchemaEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -40,6 +41,7 @@ import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
+import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.Identifier;
@@ -198,6 +200,19 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
             output.collect(
                     new StreamRecord<>(
                             new BucketWrapperChangeEvent(currentTaskNumber, (ChangeEvent) event)));
+        } else if (event instanceof FlushSchemaEvent) {
+            FlushSchemaEvent flushSchemaEvent = (FlushSchemaEvent) event;
+            for (TableId tableId : flushSchemaEvent.getChangedTables()) {
+                Optional<Schema> refreshedSchema =
+                        schemaEvolutionClient.getLatestEvolvedSchema(tableId);
+                refreshedSchema.ifPresent(
+                        schema -> schemaMaps.put(tableId, new TableSchemaInfo(schema, zoneId)));
+            }
+            output.collect(
+                    new StreamRecord<>(
+                            new BucketWrapperChangeEvent(currentTaskNumber, (ChangeEvent) event)));
+        } else {
+            throw new FlinkRuntimeException("Unknown event type in Stream record: " + event);
         }
     }
 

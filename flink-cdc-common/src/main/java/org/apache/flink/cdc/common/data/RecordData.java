@@ -239,7 +239,7 @@ public interface RecordData {
             return fieldGetter;
         }
         return row -> {
-            if (row.isNullAt(fieldPos)) {
+            if (fieldPos >= row.getArity() || row.isNullAt(fieldPos)) {
                 return null;
             }
             return fieldGetter.getFieldOrNull(row);
