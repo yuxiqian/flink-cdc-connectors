@@ -221,12 +221,22 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         // Then, for each routing terminus, coerce data records to the expected schema
         for (TableId sinkTableId : router.route(tableId)) {
             Schema evolvedSchema = evolvedSchemaMap.get(sinkTableId);
-            SchemaDerivator.coerceDataRecord(
-                            timezone,
-                            DataChangeEvent.route(dataChangeEvent, sinkTableId),
-                            originalSchema,
-                            evolvedSchema)
-                    .ifPresent(evt -> output.collect(new StreamRecord<>(evt)));
+            DataChangeEvent coercedDataRecord =
+                    SchemaDerivator.coerceDataRecord(
+                                    timezone,
+                                    DataChangeEvent.route(dataChangeEvent, sinkTableId),
+                                    originalSchema,
+                                    evolvedSchema)
+                            .orElseThrow(
+                                    () ->
+                                            new IllegalStateException(
+                                                    String.format(
+                                                            "Unable to coerce data record from %s (schema: %s) to %s (schema: %s)",
+                                                            tableId,
+                                                            originalSchema,
+                                                            sinkTableId,
+                                                            evolvedSchema)));
+            output.collect(new StreamRecord<>(coercedDataRecord));
         }
     }
 

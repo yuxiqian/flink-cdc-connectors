@@ -31,6 +31,7 @@ import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.operators.schema.common.SchemaDerivator;
 import org.apache.flink.cdc.runtime.operators.schema.common.SchemaManager;
 import org.apache.flink.cdc.runtime.operators.schema.common.SchemaRegistry;
+import org.apache.flink.cdc.runtime.operators.schema.common.event.common.FlushSuccessEvent;
 import org.apache.flink.cdc.runtime.operators.schema.common.event.common.GetOriginalSchemaRequest;
 import org.apache.flink.cdc.runtime.operators.schema.common.event.distributed.SchemaChangeRequest;
 import org.apache.flink.cdc.runtime.operators.schema.common.event.distributed.SchemaChangeResponse;
@@ -80,6 +81,9 @@ public class SchemaCoordinator extends SchemaRegistry {
                     Integer, Tuple2<SchemaChangeRequest, CompletableFuture<CoordinationResponse>>>
             pendingRequests;
 
+    /** Tracing sink writers that have flushed successfully. */
+    protected transient Set<Integer> flushedSinkWriters;
+
     /**
      * Transient upstream table schema. The second arity is source partition ID, because in
      * Map-Reduce topology, schemas might vary among partitions, so we can't rely on {@code
@@ -126,6 +130,7 @@ public class SchemaCoordinator extends SchemaRegistry {
         super.start();
         this.reducerStatus = new AtomicReference<>(RequestStatus.IDLE);
         this.pendingRequests = new ConcurrentHashMap<>();
+        this.flushedSinkWriters = ConcurrentHashMap.newKeySet();
         this.upstreamSchemaTable = HashBasedTable.create();
         this.schemaMapperSeqNum = new AtomicInteger(0);
         this.alreadyHandledSchemaChangeEvents = HashMultimap.create();
@@ -185,6 +190,12 @@ public class SchemaCoordinator extends SchemaRegistry {
             throw new UnsupportedOperationException(
                     "Unknown coordination request type: " + request);
         }
+    }
+
+    @Override
+    protected void handleFlushSuccessEvent(FlushSuccessEvent event) throws Exception {
+        LOG.info("Sink subtask {} succeed flushing.", event.getSubtask());
+        flushedSinkWriters.add(event.getSubtask());
     }
 
     @Override

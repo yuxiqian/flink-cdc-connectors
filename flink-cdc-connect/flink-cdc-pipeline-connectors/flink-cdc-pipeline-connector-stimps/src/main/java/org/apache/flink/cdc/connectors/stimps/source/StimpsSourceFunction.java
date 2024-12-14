@@ -154,15 +154,14 @@ public class StimpsSourceFunction extends RichParallelSourceFunction<Event> {
 
         sendFromTables(
                 tableId -> {
+                    CreateTableEvent createTableEvent =
+                            new CreateTableEvent(tableId, initialSchema);
+                    headSchemaMap.compute(
+                            tableId,
+                            (tbl, schema) ->
+                                    SchemaUtils.applySchemaChangeEvent(schema, createTableEvent));
+                    collect(context, createTableEvent);
                     for (int i = 0; i < 10; i++) {
-                        CreateTableEvent createTableEvent =
-                                new CreateTableEvent(tableId, initialSchema);
-                        headSchemaMap.compute(
-                                tableId,
-                                (tbl, schema) ->
-                                        SchemaUtils.applySchemaChangeEvent(
-                                                schema, createTableEvent));
-                        collect(context, createTableEvent);
                         collect(
                                 context,
                                 DataChangeEvent.insertEvent(
@@ -172,7 +171,7 @@ public class StimpsSourceFunction extends RichParallelSourceFunction<Event> {
 
         List<DataType> fullTypes = new ArrayList<>(dummyDataTypes.keySet());
         if (parallelism > 1) {
-            // Inject randomness in multi-parallelism mode
+            // Inject randomness in multi-partition mode
             Collections.shuffle(fullTypes);
         }
         fullTypes.forEach(

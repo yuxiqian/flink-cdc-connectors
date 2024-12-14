@@ -90,7 +90,6 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
     // -------------------------
     protected transient int currentParallelism;
     protected transient Set<Integer> activeSinkWriters;
-    protected transient Set<Integer> flushedSinkWriters;
     protected transient Map<Integer, SubtaskGateway> subtaskGatewayMap;
     protected transient Map<Integer, Throwable> failedReasons;
     protected transient SchemaManager schemaManager;
@@ -119,7 +118,6 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
         LOG.info("Starting SchemaRegistry - {}.", operatorName);
         this.currentParallelism = context.currentParallelism();
         this.activeSinkWriters = ConcurrentHashMap.newKeySet();
-        this.flushedSinkWriters = ConcurrentHashMap.newKeySet();
         this.subtaskGatewayMap = new ConcurrentHashMap<>();
         this.failedReasons = new ConcurrentHashMap<>();
         this.schemaManager = new SchemaManager();
@@ -152,10 +150,7 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
     }
 
     /** Overridable handler for {@link FlushSuccessEvent}s. */
-    protected void handleFlushSuccessEvent(FlushSuccessEvent event) throws Exception {
-        LOG.info("Sink subtask {} succeed flushing.", event.getSubtask());
-        flushedSinkWriters.add(event.getSubtask());
-    }
+    protected abstract void handleFlushSuccessEvent(FlushSuccessEvent event) throws Exception;
 
     /** Overridable handler for {@link GetEvolvedSchemaRequest}s. */
     protected void handleGetEvolvedSchemaRequest(
