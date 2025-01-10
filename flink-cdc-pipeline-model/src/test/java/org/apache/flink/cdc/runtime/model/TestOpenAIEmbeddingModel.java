@@ -26,7 +26,7 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 /** A test for {@link OpenAIEmbeddingModel}. */
-public class TestOpenAIEmbeddingModel {
+class TestOpenAIEmbeddingModel {
 
     @Test
     @Disabled("For manual test as there is a limit for quota.")

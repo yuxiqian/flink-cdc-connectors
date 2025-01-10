@@ -25,7 +25,7 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 /** A test for {@link OpenAIChatModel}. */
-public class TestOpenAIChatModel {
+class TestOpenAIChatModel {
     @Test
     @Disabled("For manual test as there is a limit for quota.")
     public void testEval() {
