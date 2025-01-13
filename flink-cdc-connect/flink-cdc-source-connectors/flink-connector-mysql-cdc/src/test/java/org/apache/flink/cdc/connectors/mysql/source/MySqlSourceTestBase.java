@@ -34,7 +34,6 @@ import org.apache.flink.util.TestLogger;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.ClassRule;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,7 +54,7 @@ public abstract class MySqlSourceTestBase extends TestLogger {
     protected static final MySqlContainer MYSQL_CONTAINER = createMySqlContainer(MySqlVersion.V5_7);
     protected InMemoryReporter metricReporter = InMemoryReporter.createWithRetainedMetrics();
     public static final String INTER_CONTAINER_MYSQL_ALIAS = "mysql";
-    @ClassRule public static final Network NETWORK = Network.newNetwork();
+    public static final Network NETWORK = Network.newNetwork();
 
     @RegisterExtension
     public final ExternalResourceProxy<MiniClusterWithClientResource> miniClusterResource =

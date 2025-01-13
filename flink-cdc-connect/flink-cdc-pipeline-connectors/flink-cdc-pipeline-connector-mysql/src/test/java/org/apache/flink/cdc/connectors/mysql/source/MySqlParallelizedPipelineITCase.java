@@ -90,6 +90,7 @@ class MySqlParallelizedPipelineITCase extends MySqlSourceTestBase {
     @AfterEach
     public void cleanup() {
         System.setOut(standardOut);
+        parallelismDatabase.dropDatabase();
     }
 
     @Test
