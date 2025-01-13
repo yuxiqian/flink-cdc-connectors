@@ -31,6 +31,7 @@ import org.apache.flink.util.CloseableIterator;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.testcontainers.lifecycle.Startables;
 
 import java.sql.Connection;
 import java.sql.Statement;
@@ -67,6 +68,8 @@ public class MySqlJsonArrayAsKeyIndexITCase extends MySqlSourceTestBase {
     @EnumSource
     public void testJsonArrayAsKeyIndex(MySqlVersion version) {
         this.container = createMySqlContainer(version, "docker/server-gtids/expire-seconds/my.cnf");
+        Startables.deepStart(container).join();
+
         UniqueDatabase jaakiDatabase =
                 new UniqueDatabase(container, "json_array_as_key", TEST_USER, TEST_PASSWORD);
         jaakiDatabase.createAndInitialize();
