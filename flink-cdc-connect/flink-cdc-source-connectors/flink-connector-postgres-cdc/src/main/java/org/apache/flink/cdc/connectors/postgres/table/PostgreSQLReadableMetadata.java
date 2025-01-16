@@ -24,11 +24,11 @@ import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.types.DataType;
-import org.apache.kafka.connect.data.Struct;
-import org.apache.kafka.connect.source.SourceRecord;
 
 import io.debezium.connector.AbstractSourceInfo;
 import io.debezium.data.Envelope;
+import org.apache.kafka.connect.data.Struct;
+import org.apache.kafka.connect.source.SourceRecord;
 
 /** Defines the supported metadata columns for {@link PostgreSQLTableSource}. */
 public enum PostgreSQLReadableMetadata {
@@ -81,8 +81,7 @@ public enum PostgreSQLReadableMetadata {
             }),
 
     /**
-     * It indicates the time that the change was made in the database. If the record
-     * is read from
+     * It indicates the time that the change was made in the database. If the record is read from
      * snapshot of the table instead of the change stream, the value is always 0.
      */
     OP_TS(
@@ -101,8 +100,7 @@ public enum PostgreSQLReadableMetadata {
             }),
 
     /**
-     * It indicates the row kind of the changelog. '+I' means INSERT message, '-D'
-     * means DELETE
+     * It indicates the row kind of the changelog. '+I' means INSERT message, '-D' means DELETE
      * message, '-U' means UPDATE_BEFORE message and '+U' means UPDATE_AFTER message
      */
     ROW_KIND(
