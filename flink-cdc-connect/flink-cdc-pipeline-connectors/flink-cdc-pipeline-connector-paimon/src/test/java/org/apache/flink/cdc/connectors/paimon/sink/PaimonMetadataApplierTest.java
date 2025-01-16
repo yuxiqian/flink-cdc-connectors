@@ -140,11 +140,8 @@ class PaimonMetadataApplierTest {
         Assertions.assertThat(catalog.getTable(Identifier.fromString("test.table1")).rowType())
                 .isEqualTo(tableSchema);
 
-        Assertions.assertEquals(
-                "col3DefValue",
-                catalog.getTable(Identifier.fromString("test.table1"))
-                        .options()
-                        .get("fields.col3.default-value"));
+        Assertions.assertThat(catalog.getTable(Identifier.fromString("test.table1")).options())
+                .containsEntry("fields.col3.default-value", "col3DefValue");
 
         Map<String, String> nameMapping = new HashMap<>();
         nameMapping.put("col2", "newcol2");

@@ -78,6 +78,7 @@ import static org.apache.flink.table.api.DataTypes.BIGINT;
 import static org.apache.flink.table.api.DataTypes.STRING;
 import static org.apache.flink.table.catalog.Column.physical;
 import static org.apache.flink.util.Preconditions.checkState;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** IT tests for {@link PostgresSourceBuilder.PostgresIncrementalSource}. */
 @Timeout(value = 300, unit = TimeUnit.SECONDS)
@@ -687,8 +688,9 @@ class PostgresSourceITCase extends PostgresTestBase {
         }
     }
 
-    @Test
-    public void testHeartBeat() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"initial", "latest-offset"})
+    void testHeartBeat(String scanStartupMode) throws Exception {
         try (PostgresConnection connection = getConnection()) {
             connection.execute("CREATE TABLE IF NOT EXISTS heart_beat_table(a int)");
             connection.commit();
@@ -696,7 +698,7 @@ class PostgresSourceITCase extends PostgresTestBase {
 
         TableId tableId = new TableId(null, "public", "heart_beat_table");
         try (PostgresConnection connection = getConnection()) {
-            assertEquals(0, getCountOfTable(connection, tableId));
+            Assertions.assertThat(getCountOfTable(connection, tableId)).isZero();
         }
 
         Map<String, String> options = new HashMap<>();
@@ -711,7 +713,7 @@ class PostgresSourceITCase extends PostgresTestBase {
                 RestartStrategies.noRestart(),
                 options);
         try (PostgresConnection connection = getConnection()) {
-            assertTrue(getCountOfTable(connection, tableId) > 0);
+            assertThat(getCountOfTable(connection, tableId)).isGreaterThan(0);
         }
     }
 

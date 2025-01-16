@@ -71,7 +71,6 @@ import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.PA
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.SINK_ENABLE_BATCH_MODE;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.SINK_ENABLE_DELETE;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.USERNAME;
-import static org.junit.Assert.fail;
 
 /** IT tests for {@link DorisMetadataApplier}. */
 class DorisMetadataApplierITCase extends DorisSinkTestBase {
@@ -446,8 +445,9 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
                 .isExactlyInstanceOf(JobExecutionException.class);
     }
 
-    @Test
-    public void testDorisTruncateTable() throws Exception {
+    @ParameterizedTest(name = "batchMode: {0}")
+    @ValueSource(booleans = {true, false})
+    void testDorisTruncateTable(boolean batchMode) throws Exception {
         TableId tableId =
                 TableId.tableId(
                         DorisContainer.DORIS_DATABASE_NAME, DorisContainer.DORIS_TABLE_NAME);
@@ -465,7 +465,7 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
                         new CreateTableEvent(tableId, schema),
                         DataChangeEvent.insertEvent(tableId, generate(schema, 1, 2.3, "Alice")),
                         DataChangeEvent.insertEvent(tableId, generate(schema, 2, 3.4, "Bob")));
-        runJobWithEvents(preparationTestingEvents);
+        runJobWithEvents(preparationTestingEvents, batchMode);
         waitAndVerify(
                 tableId,
                 3,
@@ -478,7 +478,7 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
                         new TruncateTableEvent(tableId),
                         DataChangeEvent.insertEvent(tableId, generate(schema, 3, 4.5, "Cecily")),
                         DataChangeEvent.insertEvent(tableId, generate(schema, 4, 5.6, "Derrida")));
-        runJobWithEvents(truncateTestingEvents);
+        runJobWithEvents(truncateTestingEvents, batchMode);
         waitAndVerify(
                 tableId,
                 3,
@@ -486,8 +486,9 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
                 DATABASE_OPERATION_TIMEOUT_SECONDS * 1000L);
     }
 
-    @Test
-    public void testDorisDropTable() throws Exception {
+    @ParameterizedTest(name = "batchMode: {0}")
+    @ValueSource(booleans = {true, false})
+    void testDorisDropTable(boolean batchMode) throws Exception {
         TableId tableId =
                 TableId.tableId(
                         DorisContainer.DORIS_DATABASE_NAME, DorisContainer.DORIS_TABLE_NAME);
@@ -505,7 +506,7 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
                         new CreateTableEvent(tableId, schema),
                         DataChangeEvent.insertEvent(tableId, generate(schema, 1, 2.3, "Alice")),
                         DataChangeEvent.insertEvent(tableId, generate(schema, 2, 3.4, "Bob")));
-        runJobWithEvents(preparationTestingEvents);
+        runJobWithEvents(preparationTestingEvents, batchMode);
 
         waitAndVerify(
                 tableId,
@@ -514,17 +515,15 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
                 DATABASE_OPERATION_TIMEOUT_SECONDS * 1000L);
 
         runJobWithEvents(
-                Arrays.asList(new CreateTableEvent(tableId, schema), new DropTableEvent(tableId)));
+                Arrays.asList(new CreateTableEvent(tableId, schema), new DropTableEvent(tableId)),
+                batchMode);
 
-        SQLSyntaxErrorException thrown =
-                Assertions.assertThrows(
-                        SQLSyntaxErrorException.class, () -> fetchTableContent(tableId, 3));
-        Assertions.assertTrue(
-                thrown.getMessage()
-                        .contains(
-                                String.format(
-                                        "errCode = 2, detailMessage = Unknown table '%s'",
-                                        tableId.getTableName())));
+        Assertions.assertThatThrownBy(() -> fetchTableContent(tableId, 3))
+                .isExactlyInstanceOf(SQLSyntaxErrorException.class)
+                .hasMessageContaining(
+                        String.format(
+                                "errCode = 2, detailMessage = Unknown table '%s'",
+                                tableId.getTableName()));
     }
 
     private void runJobWithEvents(List<Event> events, boolean batchMode) throws Exception {
@@ -608,6 +607,6 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
                     actual);
             Thread.sleep(1000L);
         }
-        fail(String.format("Failed to verify content of %s.", tableId));
+        Assertions.fail("Failed to verify content of {}.", tableId);
     }
 }

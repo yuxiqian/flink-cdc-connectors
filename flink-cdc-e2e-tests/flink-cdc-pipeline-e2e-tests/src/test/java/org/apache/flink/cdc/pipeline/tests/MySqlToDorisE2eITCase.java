@@ -31,7 +31,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.Container;
 import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy;
 import org.testcontainers.lifecycle.Startables;
 
@@ -47,11 +46,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 /** End-to-end tests for mysql cdc to Doris pipeline job. */
 class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
@@ -755,9 +751,7 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
 
             stat.execute("DROP TABLE products;");
             Thread.sleep(5000L);
-            SQLException thrown =
-                    assertThrows(
-                            SQLSyntaxErrorException.class,
+            Assertions.assertThatThrownBy(
                             () -> {
                                 try (Connection connection =
                                                 DriverManager.getConnection(
@@ -767,10 +761,9 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                                         Statement statement = connection.createStatement()) {
                                     statement.executeQuery("SELECT * FROM products;");
                                 }
-                            });
-            assertTrue(
-                    thrown.getMessage()
-                            .contains("errCode = 2, detailMessage = Unknown table 'products'"));
+                            })
+                    .isExactlyInstanceOf(SQLSyntaxErrorException.class)
+                    .hasMessageContaining("errCode = 2, detailMessage = Unknown table 'products'");
         } catch (SQLException e) {
             throw new RuntimeException("Failed to trigger schema change.", e);
         }
@@ -872,7 +865,7 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
             }
             Thread.sleep(1000L);
         }
-        fail(String.format("Failed to verify content of %s::%s.", databaseName, sql));
+        Assertions.fail("Failed to verify content of {}::{}.", databaseName, sql);
     }
 
     private List<String> fetchTableContent(String databaseName, String sql, int columnCount)

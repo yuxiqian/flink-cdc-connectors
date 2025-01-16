@@ -49,13 +49,13 @@ import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
+import com.mysql.jdbc.exceptions.jdbc4.MySQLSyntaxErrorException;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import com.mysql.jdbc.exceptions.jdbc4.MySQLSyntaxErrorException;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -414,13 +414,12 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
                         new DropTableEvent(tableId));
         runJobWithEvents(dropTableTestingEvents);
 
-        Assertions.assertThatThrownBy(
-                () -> fetchTableContent(tableId, 3)
-        ).isExactlyInstanceOf(MySQLSyntaxErrorException.class)
-                        .hasMessage(
-                String.format(
-                        "Getting analyzing error. Detail message: Unknown table '%s.%s'.",
-                        tableId.getSchemaName(), tableId.getTableName()));
+        Assertions.assertThatThrownBy(() -> fetchTableContent(tableId, 3))
+                .isExactlyInstanceOf(MySQLSyntaxErrorException.class)
+                .hasMessageContaining(
+                        String.format(
+                                "Getting analyzing error. Detail message: Unknown table '%s.%s'.",
+                                tableId.getSchemaName(), tableId.getTableName()));
     }
 
     private void runJobWithEvents(List<Event> events) throws Exception {
