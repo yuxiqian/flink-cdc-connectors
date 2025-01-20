@@ -947,7 +947,7 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         List<SourceRecord> sourceRecords =
                 pollRecordsFromReader(binlogReader, RecordUtils::isDataChangeRecord);
         MYSQL_CONTAINER_NOGTID.stop();
-        assertTrue(sourceRecords.isEmpty());
+        Assertions.assertThat(sourceRecords).isEmpty();
     }
 
     private BinlogSplitReader createBinlogReader(MySqlSourceConfig sourceConfig) {
