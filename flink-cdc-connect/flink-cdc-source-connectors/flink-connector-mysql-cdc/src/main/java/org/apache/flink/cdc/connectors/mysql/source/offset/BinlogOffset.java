@@ -251,10 +251,20 @@ public class BinlogOffset implements Comparable<BinlogOffset>, Serializable {
         }
 
         // The completed events are the same, so compare the row number ...
+        System.out.printf(
+                "!!!!!!!!!!!!!!!! The completed events are the same, so compare the row number ... this: %s, that: %s\n",
+                this, that);
+
+        System.out.printf(
+                "!!!!!!!!!!!!!!!! (this|that).getRestartSkipRows(): %s / %s\n",
+                this.getRestartSkipRows(), that.getRestartSkipRows());
         if (this.getRestartSkipRows() != that.getRestartSkipRows()) {
             return Long.compare(this.getRestartSkipRows(), that.getRestartSkipRows());
         }
 
+        System.out.printf(
+                "!!!!!!!!!!!!!!!! (this|that).timestampSec(): %s / %s\n",
+                this.getTimestampSec(), that.getTimestampSec());
         // The skip rows are the same, so compare the timestamp ...
         return Long.compare(this.getTimestampSec(), that.getTimestampSec());
     }

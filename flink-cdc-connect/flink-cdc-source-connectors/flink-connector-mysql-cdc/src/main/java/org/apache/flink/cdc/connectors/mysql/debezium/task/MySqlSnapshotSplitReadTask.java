@@ -160,6 +160,10 @@ public class MySqlSnapshotSplitReadTask
                         BinlogOffset.TIMESTAMP_KEY,
                         String.valueOf(clock.currentTime().getEpochSecond()));
         LOG.info(
+                "!!!!!!!!!!!!!!!! Filled in low watermark: {}, timestamp: {}",
+                lowWatermark,
+                lowWatermark.getTimestampSec());
+        LOG.info(
                 "Snapshot step 1 - Determining low watermark {} for split {}",
                 lowWatermark,
                 snapshotSplit);
@@ -197,6 +201,10 @@ public class MySqlSnapshotSplitReadTask
                     .put(
                             BinlogOffset.TIMESTAMP_KEY,
                             String.valueOf(clock.currentTime().getEpochSecond()));
+            LOG.info(
+                    "!!!!!!!!!!!!!!!! Filled in high watermark: {}, timestamp: {}",
+                    highWatermark,
+                    highWatermark.getTimestampSec());
         }
 
         LOG.info(

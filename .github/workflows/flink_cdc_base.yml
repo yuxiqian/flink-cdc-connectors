@@ -148,7 +148,7 @@ jobs:
           maven-version: 3.8.6
 
       - name: Compile and test
-        timeout-minutes: 15
+        timeout-minutes: 10
         run: |
           set -o pipefail
 
