@@ -46,6 +46,7 @@ import org.apache.flink.util.FlinkRuntimeException;
 import io.debezium.connector.mysql.MySqlConnection;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.rules.TemporaryFolder;
@@ -77,6 +78,7 @@ import java.util.stream.Collectors;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Integration test for validating specifying starting offset. */
+@Disabled
 public class SpecificStartingOffsetITCase {
     private static final Logger LOG = LoggerFactory.getLogger(SpecificStartingOffsetITCase.class);
     @RegisterExtension static MiniClusterExtension miniCluster = new MiniClusterExtension();

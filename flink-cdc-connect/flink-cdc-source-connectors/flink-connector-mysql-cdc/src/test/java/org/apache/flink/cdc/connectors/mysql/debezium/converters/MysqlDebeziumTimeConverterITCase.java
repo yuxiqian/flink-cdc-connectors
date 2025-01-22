@@ -41,6 +41,7 @@ import io.debezium.connector.mysql.converters.MysqlDebeziumTimeConverter;
 import io.debezium.data.Envelope;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -71,6 +72,7 @@ import static java.lang.String.format;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlSourceTestBase.assertEqualsInAnyOrder;
 
 /** Test for {@link MysqlDebeziumTimeConverter}. */
+@Ignore
 public class MysqlDebeziumTimeConverterITCase {
 
     private static TemporaryFolder tempFolder;

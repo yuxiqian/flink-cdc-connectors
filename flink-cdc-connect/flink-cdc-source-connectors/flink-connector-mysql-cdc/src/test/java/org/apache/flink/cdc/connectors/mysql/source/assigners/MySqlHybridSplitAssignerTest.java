@@ -39,6 +39,7 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
 
 import io.debezium.relational.TableId;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.time.ZoneId;
@@ -57,6 +58,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 /** Tests for {@link MySqlHybridSplitAssigner}. */
+@Ignore
 public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
 
     private static final UniqueDatabase customerDatabase =

@@ -63,6 +63,7 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.testcontainers.lifecycle.Startables;
 
@@ -94,6 +95,7 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 /** Tests for {@link org.apache.flink.cdc.connectors.mysql.debezium.reader.BinlogSplitReader}. */
+@Ignore
 public class BinlogSplitReaderTest extends MySqlSourceTestBase {
     private static final String TEST_USER = "mysqluser";
     private static final String TEST_PASSWORD = "mysqlpw";

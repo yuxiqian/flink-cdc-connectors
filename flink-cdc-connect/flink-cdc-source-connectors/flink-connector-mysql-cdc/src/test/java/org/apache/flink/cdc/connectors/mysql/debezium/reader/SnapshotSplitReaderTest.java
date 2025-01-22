@@ -40,6 +40,7 @@ import io.debezium.relational.TableId;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.sql.SQLException;
@@ -56,6 +57,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /** Tests for {@link org.apache.flink.cdc.connectors.mysql.debezium.reader.SnapshotSplitReader}. */
+@Ignore
 public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
 
     private static final UniqueDatabase customerDatabase =

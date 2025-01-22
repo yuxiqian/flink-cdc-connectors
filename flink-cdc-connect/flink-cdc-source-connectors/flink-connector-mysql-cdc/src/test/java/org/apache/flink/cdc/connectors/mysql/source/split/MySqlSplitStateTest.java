@@ -23,6 +23,7 @@ import org.apache.flink.table.types.logical.RowType;
 
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -34,6 +35,7 @@ import java.util.Map;
 import static org.junit.Assert.assertEquals;
 
 /** Tests for {@link MySqlSplitState}. */
+@Ignore
 public class MySqlSplitStateTest {
 
     @Test

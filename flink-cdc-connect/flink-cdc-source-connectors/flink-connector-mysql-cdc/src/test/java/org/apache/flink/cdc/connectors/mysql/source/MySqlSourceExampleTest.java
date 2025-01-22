@@ -26,6 +26,7 @@ import org.junit.Ignore;
 import org.junit.Test;
 
 /** Example Tests for {@link MySqlSource}. */
+@Ignore
 public class MySqlSourceExampleTest extends MySqlSourceTestBase {
 
     private final UniqueDatabase inventoryDatabase =

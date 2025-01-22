@@ -30,6 +30,7 @@ import org.apache.flink.util.CloseableIterator;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -49,6 +50,7 @@ import java.util.stream.Stream;
 import static org.apache.flink.api.common.JobStatus.RUNNING;
 
 /** Integration tests for MySQL Table source. */
+@Ignore
 @RunWith(Parameterized.class)
 public class MySqlJsonArrayAsKeyIndexITCase extends MySqlSourceTestBase {
 

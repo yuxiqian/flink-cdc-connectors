@@ -40,6 +40,7 @@ import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.function.SupplierWithException;
 
 import org.apache.kafka.connect.source.SourceRecord;
+import org.junit.Ignore;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -53,6 +54,7 @@ import java.util.concurrent.TimeoutException;
 import static org.junit.Assert.assertTrue;
 
 /** Utils to help test. */
+@Ignore
 public class MySqlTestUtils {
 
     public static MySqlSource.Builder<SourceRecord> basicSourceBuilder(

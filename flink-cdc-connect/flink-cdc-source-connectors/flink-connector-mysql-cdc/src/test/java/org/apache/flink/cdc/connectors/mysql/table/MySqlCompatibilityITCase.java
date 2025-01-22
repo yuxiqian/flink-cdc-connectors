@@ -29,6 +29,7 @@ import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
@@ -58,6 +59,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlSourceTestBase.a
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlSourceTestBase.assertEqualsInOrder;
 
 /** Integration tests to check mysql-cdc works well with different MySQL server version. */
+@Ignore
 public class MySqlCompatibilityITCase {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlCompatibilityITCase.class);

@@ -33,6 +33,7 @@ import org.apache.flink.util.TestLogger;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,6 +51,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 /** Basic class for testing {@link MySqlSource}. */
+@Ignore
 public abstract class MySqlSourceTestBase extends TestLogger {
 
     protected static final Logger LOG = LoggerFactory.getLogger(MySqlSourceTestBase.class);

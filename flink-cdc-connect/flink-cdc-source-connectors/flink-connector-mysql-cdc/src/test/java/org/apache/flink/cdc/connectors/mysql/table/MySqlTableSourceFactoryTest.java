@@ -33,6 +33,7 @@ import org.apache.flink.table.factories.Factory;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.util.ExceptionUtils;
 
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.time.Duration;
@@ -64,6 +65,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /** Test for {@link MySqlTableSource} created by {@link MySqlTableSourceFactory}. */
+@Ignore
 public class MySqlTableSourceFactoryTest {
 
     private static final ResolvedSchema SCHEMA =

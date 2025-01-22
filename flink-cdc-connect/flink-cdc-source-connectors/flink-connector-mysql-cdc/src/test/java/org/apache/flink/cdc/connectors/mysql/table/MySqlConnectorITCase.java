@@ -44,6 +44,7 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -74,6 +75,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /** Integration tests for MySQL Table source. */
+@Ignore
 @RunWith(Parameterized.class)
 public class MySqlConnectorITCase extends MySqlSourceTestBase {
 

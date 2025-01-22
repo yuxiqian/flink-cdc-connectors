@@ -62,6 +62,10 @@ import static org.junit.Assert.assertTrue;
 
 /** Basic class for testing Database Polardbx which supported the mysql protocol. */
 public abstract class PolardbxSourceTestBase extends AbstractTestBase {
+
+    //    @Rule
+    //    public final Timeout timeout = new Timeout(600_000_000, TimeUnit.SECONDS);
+
     private static final Logger LOG = LoggerFactory.getLogger(PolardbxSourceTestBase.class);
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
     protected static final Integer PORT = 8527;

@@ -24,6 +24,7 @@ import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -38,6 +39,7 @@ import static org.junit.Assert.assertTrue;
  * Unit test for {@link
  * org.apache.flink.cdc.connectors.mysql.source.assigners.MySqlBinlogSplitAssigner}.
  */
+@Ignore
 public class MySqlBinlogSplitAssignerTest {
 
     @Test

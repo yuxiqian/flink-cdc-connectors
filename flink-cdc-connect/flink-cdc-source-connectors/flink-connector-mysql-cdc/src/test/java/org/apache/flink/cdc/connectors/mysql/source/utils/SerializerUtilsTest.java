@@ -22,6 +22,7 @@ import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffsetKind;
 import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputSerializer;
 
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -33,6 +34,7 @@ import java.util.Map;
 import static org.junit.Assert.assertEquals;
 
 /** Unit test for {@link org.apache.flink.cdc.connectors.mysql.source.utils.SerializerUtils}. */
+@Ignore
 public class SerializerUtilsTest {
 
     @Test

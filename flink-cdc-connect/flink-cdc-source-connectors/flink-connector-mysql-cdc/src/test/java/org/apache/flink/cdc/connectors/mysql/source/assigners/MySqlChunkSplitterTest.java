@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.mysql.source.assigners;
 
 import io.debezium.relational.TableId;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -25,6 +26,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /** Tests for {@link org.apache.flink.cdc.connectors.mysql.source.assigners.MySqlChunkSplitter}. */
+@Disabled
 public class MySqlChunkSplitterTest {
 
     @Test

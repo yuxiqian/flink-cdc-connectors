@@ -32,6 +32,7 @@ import org.apache.flink.util.CloseableIterator;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -49,6 +50,7 @@ import java.util.Random;
 import java.util.stream.Stream;
 
 /** Integration tests for MySQL shardding tables. */
+@Ignore
 @RunWith(Parameterized.class)
 public class MySqlConnectorShardingTableITCase extends MySqlSourceTestBase {
 

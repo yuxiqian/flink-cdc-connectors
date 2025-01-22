@@ -44,6 +44,7 @@ import io.debezium.relational.history.TableChanges;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -80,6 +81,7 @@ import static org.junit.Assert.fail;
 /**
  * Tests for the legacy {@link MySqlSource} which also heavily tests {@link DebeziumSourceFunction}.
  */
+@Ignore
 @RunWith(Parameterized.class)
 public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
 

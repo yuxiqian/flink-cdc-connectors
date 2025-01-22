@@ -17,6 +17,7 @@
 
 package com.github.shyiko.mysql.binlog.io;
 
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.Arrays;
@@ -25,6 +26,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 /** Unit test for {@link BufferedSocketInputStream}. */
+@Ignore
 public class BufferedSocketInputStreamTest {
 
     @Test

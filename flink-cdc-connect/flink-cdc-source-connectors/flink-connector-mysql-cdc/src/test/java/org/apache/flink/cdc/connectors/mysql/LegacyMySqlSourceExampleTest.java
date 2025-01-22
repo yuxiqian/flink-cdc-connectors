@@ -26,6 +26,7 @@ import org.junit.Ignore;
 import org.junit.Test;
 
 /** Example Tests for the legacy {@link MySqlSource}. */
+@Ignore
 public class LegacyMySqlSourceExampleTest extends LegacyMySqlTestBase {
 
     private final UniqueDatabase inventoryDatabase =

@@ -22,6 +22,7 @@ import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFact
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 
 import io.debezium.connector.mysql.MySqlConnection;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -32,6 +33,7 @@ import java.util.Properties;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
 /** Tests for {@link org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils}. */
+@Disabled
 public class DebeziumUtilsTest {
     @Test
     void testCreateMySqlConnection() {

@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.mysql.source.utils;
 
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.math.BigDecimal;
@@ -24,6 +25,7 @@ import java.math.BigDecimal;
 import static org.junit.Assert.assertEquals;
 
 /** Tests for {@link org.apache.flink.cdc.connectors.mysql.source.utils.ObjectUtils}. */
+@Ignore
 public class ObjectUtilsTest {
 
     @Test

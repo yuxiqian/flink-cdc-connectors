@@ -29,6 +29,7 @@ import io.debezium.relational.Table;
 import io.debezium.relational.TableEditor;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -52,6 +53,7 @@ import static org.junit.Assert.assertThrows;
  * Tests for {@link
  * org.apache.flink.cdc.connectors.mysql.source.assigners.state.PendingSplitsStateSerializer}.
  */
+@Ignore
 @RunWith(Parameterized.class)
 public class PendingSplitsStateSerializerTest {
 

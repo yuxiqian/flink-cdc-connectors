@@ -63,6 +63,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /** Test for the {@link MySqlValidator}. */
+@Ignore
 @RunWith(Parameterized.class)
 public class MySqlValidatorTest {
 

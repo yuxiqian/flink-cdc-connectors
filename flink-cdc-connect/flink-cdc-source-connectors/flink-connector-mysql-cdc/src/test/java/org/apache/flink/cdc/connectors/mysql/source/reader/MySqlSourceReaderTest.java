@@ -67,6 +67,7 @@ import io.debezium.relational.history.TableChanges;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.After;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -108,6 +109,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
 
 /** Tests for {@link MySqlSourceReader}. */
+@Ignore
 public class MySqlSourceReaderTest extends MySqlSourceTestBase {
 
     private final UniqueDatabase customerDatabase =

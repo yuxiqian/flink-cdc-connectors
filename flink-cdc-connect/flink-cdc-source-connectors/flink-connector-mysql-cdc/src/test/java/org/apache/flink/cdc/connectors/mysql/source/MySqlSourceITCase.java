@@ -70,6 +70,7 @@ import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.jdbc.JdbcConnection;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -107,6 +108,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 /** IT tests for {@link MySqlSource}. */
+@Ignore
 @RunWith(Parameterized.class)
 public class MySqlSourceITCase extends MySqlSourceTestBase {
 

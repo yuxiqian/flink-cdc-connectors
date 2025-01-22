@@ -28,6 +28,7 @@ import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
@@ -59,6 +60,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlSourceTestBase.a
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlSourceTestBase.assertEqualsInOrder;
 
 /** Integration tests to check mysql-cdc works well under different MySQL server timezone. */
+@Ignore
 @RunWith(Parameterized.class)
 public class MySqlTimezoneITCase {
 

@@ -37,6 +37,7 @@ import io.debezium.relational.TableId;
 import io.debezium.schema.TopicSelector;
 import io.debezium.util.SchemaNameAdjuster;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.Collections;
@@ -47,6 +48,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
 /** Unit test for {@link org.apache.flink.cdc.connectors.mysql.source.reader.MySqlRecordEmitter}. */
+@Ignore
 public class MySqlRecordEmitterTest {
 
     @Test

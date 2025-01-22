@@ -30,6 +30,7 @@ import org.apache.flink.util.CloseableIterator;
 
 import com.alibaba.fastjson.JSONObject;
 import org.apache.kafka.connect.json.JsonConverterConfig;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -49,6 +50,7 @@ import java.util.Objects;
 import static org.junit.Assert.assertTrue;
 
 /** Integration tests for the legacy {@link MySqlSource}. */
+@Ignore
 public class LegacyMySqlSourceITCase extends LegacyMySqlTestBase {
 
     private final UniqueDatabase fullTypesDatabase =

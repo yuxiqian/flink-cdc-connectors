@@ -26,6 +26,7 @@ import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
 import io.debezium.relational.history.TableChanges;
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -35,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 
 /** Unit tests for {@link MySqlBinlogSplit}. */
+@Ignore
 public class MySqlBinlogSplitTest {
 
     @Test

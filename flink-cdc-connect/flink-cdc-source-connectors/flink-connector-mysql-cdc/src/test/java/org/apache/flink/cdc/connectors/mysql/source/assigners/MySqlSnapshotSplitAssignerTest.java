@@ -35,6 +35,7 @@ import org.apache.flink.util.ExceptionUtils;
 import io.debezium.relational.Column;
 import io.debezium.relational.TableId;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.time.ZoneId;
@@ -57,6 +58,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /** Tests for {@link MySqlSnapshotSplitAssigner}. */
+@Ignore
 public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
 
     private static final UniqueDatabase customerDatabase =

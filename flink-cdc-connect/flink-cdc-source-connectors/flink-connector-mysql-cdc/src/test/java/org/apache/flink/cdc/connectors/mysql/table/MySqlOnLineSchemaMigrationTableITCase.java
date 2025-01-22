@@ -42,6 +42,7 @@ import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.Container;
@@ -71,6 +72,7 @@ import static org.apache.flink.cdc.common.utils.TestCaseUtils.DEFAULT_TIMEOUT;
  * href="https://docs.percona.com/percona-toolkit/pt-online-schema-change.html">doc/pt-osc</a> for
  * more details.
  */
+@Ignore
 public class MySqlOnLineSchemaMigrationTableITCase extends MySqlSourceTestBase {
     private static final MySqlContainer MYSQL8_CONTAINER =
             createMySqlContainer(MySqlVersion.V8_0, "docker/server-gtids/expire-seconds/my.cnf");

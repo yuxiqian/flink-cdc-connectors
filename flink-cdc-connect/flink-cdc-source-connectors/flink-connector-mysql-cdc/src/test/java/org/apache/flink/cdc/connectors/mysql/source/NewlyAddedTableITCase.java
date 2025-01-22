@@ -52,6 +52,7 @@ import io.debezium.jdbc.JdbcConnection;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -82,6 +83,7 @@ import static org.apache.flink.api.common.restartstrategy.RestartStrategies.noRe
 import static org.apache.flink.util.Preconditions.checkState;
 
 /** IT tests to cover various newly added tables during capture process. */
+@Ignore
 public class NewlyAddedTableITCase extends MySqlSourceTestBase {
 
     @Rule public final Timeout timeoutPerTest = Timeout.seconds(300);

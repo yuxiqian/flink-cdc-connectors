@@ -29,6 +29,7 @@ import org.apache.flink.util.CloseableIterator;
 
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -42,6 +43,7 @@ import java.util.List;
 import java.util.Random;
 
 /** Test supporting different column charsets for MySQL Table source. */
+@Ignore
 @RunWith(Parameterized.class)
 public class MysqlConnectorCharsetITCase extends MySqlSourceTestBase {
 

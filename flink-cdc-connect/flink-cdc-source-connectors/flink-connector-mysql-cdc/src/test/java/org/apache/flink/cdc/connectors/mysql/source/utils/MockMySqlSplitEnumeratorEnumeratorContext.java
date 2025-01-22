@@ -20,7 +20,10 @@ package org.apache.flink.cdc.connectors.mysql.source.utils;
 import org.apache.flink.api.connector.source.mocks.MockSplitEnumeratorContext;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
 
+import org.junit.Ignore;
+
 /** A mock enumerator context to record isProcessingBacklog. */
+@Ignore
 public class MockMySqlSplitEnumeratorEnumeratorContext
         extends MockSplitEnumeratorContext<MySqlSplit> {
     private boolean isProcessingBacklog = false;

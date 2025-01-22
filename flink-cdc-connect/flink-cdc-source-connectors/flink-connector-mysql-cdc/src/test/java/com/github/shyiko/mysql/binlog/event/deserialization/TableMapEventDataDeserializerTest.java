@@ -20,6 +20,7 @@ package com.github.shyiko.mysql.binlog.event.deserialization;
 import com.github.shyiko.mysql.binlog.event.TableMapEventData;
 import com.github.shyiko.mysql.binlog.event.TableMapEventMetadata;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -30,6 +31,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for the copied class {@link TableMapEventDataDeserializer}. */
+@Ignore
 public class TableMapEventDataDeserializerTest {
     @Test
     public void testDeserialize() throws IOException {

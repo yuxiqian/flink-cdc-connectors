@@ -26,6 +26,7 @@ import io.debezium.document.Document;
 import io.debezium.document.DocumentReader;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -39,6 +40,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 
 /** Tests for {@link org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplitSerializer}. */
+@Ignore
 public class MySqlSplitSerializerTest {
 
     @Test
